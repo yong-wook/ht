@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고스톱</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>고스톱</h1>
+    <div id="status-message" class="status-message"></div>
+    <div id="scoreboard" class="scoreboard">
+        <div>플레이어 점수: <span id="player-score">0</span></div>
+        <div>컴퓨터 점수: <span id="computer-score">0</span></div>
+    </div>
+    <div id="game-board" class="game-board">
+        <div id="computer-hand" class="hand-area">
+            <h2>컴퓨터</h2>
+            <div class="card-container"></div>
+            <div class="acquired-cards">
+                <h3>획득한 패</h3>
+                <div class="card-container"></div>
+            </div>
+        </div>
+        <div id="field" class="field">
+            <h2>판</h2>
+            <div class="card-container"></div>
+        </div>
+        <div id="player-hand" class="hand-area">
+            <h2>플레이어</h2>
+            <div class="card-container"></div>
+             <div class="acquired-cards">
+                <h3>획득한 패</h3>
+                <div class="card-container"></div>
+            </div>
+        </div>
+    </div>
+    <div id="controls" class="controls">
+        <button id="go-button">고</button>
+        <button id="stop-button">스톱</button>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

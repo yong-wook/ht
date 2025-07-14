@@ -1,0 +1,115 @@
+body {
+    font-family: sans-serif;
+    background-color: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+h1 {
+    margin-top: 20px;
+}
+
+.status-message {
+    margin-top: 20px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.scoreboard {
+    display: flex;
+    justify-content: space-around;
+    width: 300px;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.game-board {
+    display: flex;
+    justify-content: space-between;
+    width: 90%;
+    max-width: 1200px;
+    margin-top: 20px;
+    background-color: #2a623d; /* 녹색 배경 */
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+.hand-area, .field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #3a734d;
+    min-width: 300px;
+}
+
+.field {
+    flex-grow: 1;
+    margin: 0 20px;
+}
+
+h2, h3 {
+    margin: 0 0 10px 0;
+    color: white;
+}
+
+.card-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    min-height: 80px;
+}
+
+.acquired-cards {
+    width: 100%;
+    margin-top: 10px;
+    border-top: 1px solid #ccc;
+    padding-top: 10px;
+}
+
+.acquired-group {
+    margin-bottom: 10px;
+}
+
+.acquired-group h4 {
+    margin: 5px 0;
+    color: #eee;
+    font-size: 14px;
+}
+
+.acquired-group-cards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    min-height: 50px;
+    border: 1px dashed #555;
+    padding: 5px;
+    border-radius: 5px;
+}
+
+.card {
+    width: 50px;
+    height: 80px;
+    border: 1px solid #000;
+    border-radius: 5px;
+    margin: 2px;
+    background-color: white;
+    background-size: cover;
+    cursor: pointer;
+}
+
+
+.controls {
+    margin-top: 20px;
+}
+
+.card.selectable {
+    border: 2px solid yellow;
+    cursor: pointer;
+}
