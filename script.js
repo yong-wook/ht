@@ -561,7 +561,11 @@ function displayAcquiredCardsGrouped(cards, container) {
             groupDiv.classList.add('acquired-group');
 
             const groupTitle = document.createElement('h4');
-            groupTitle.textContent = `${typeInfo.name} (${typeInfo.cards.length}장)`;
+            let displayCount = typeInfo.cards.length;
+            if (typeKey === 'pi') {
+                displayCount = typeInfo.cards.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : 1), 0);
+            }
+            groupTitle.textContent = `${typeInfo.name} (${displayCount}장)`;
             groupDiv.appendChild(groupTitle);
 
             const groupCardContainer = document.createElement('div');
@@ -578,9 +582,6 @@ function displayAcquiredCardsGrouped(cards, container) {
                 };
 
                 groupCardContainer.appendChild(createCardDiv());
-                if (card.type === 'ssangpi') {
-                    groupCardContainer.appendChild(createCardDiv()); // 쌍피는 두 장으로 표시
-                }
             });
             groupDiv.appendChild(groupCardContainer);
             container.appendChild(groupDiv);
