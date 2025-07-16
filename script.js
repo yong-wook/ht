@@ -1,30 +1,30 @@
 // prettier-ignore
 const CARDS = [
     { id: 1, month: 1, type: "gwang", value: 20, img: "images/01_gwang.jpg" },
-    { id: 2, month: 1, type: "tti", value: 5, img: "images/01_tti.jpg" },
+    { id: 2, month: 1, type: "tti", value: 5, dan: 'hong', img: "images/01_tti.jpg" },
     { id: 3, month: 1, type: "pi", value: 1, img: "images/01_pi.jpg" },
     { id: 4, month: 1, type: "pi", value: 1, img: "images/01_pi.jpg" },
-    { id: 5, month: 2, type: "tti", value: 5, img: "images/02_tti.jpg" },
+    { id: 5, month: 2, type: "tti", value: 5, dan: 'hong', img: "images/02_tti.jpg" },
     { id: 6, month: 2, type: "pi", value: 1, img: "images/02_pi.jpg" },
     { id: 7, month: 2, type: "pi", value: 1, img: "images/02_pi.jpg" },
     { id: 8, month: 2, type: "ggot", value: 10, img: "images/02_ggot.jpg" },
     { id: 9, month: 3, type: "gwang", value: 20, img: "images/03_gwang.jpg" },
-    { id: 10, month: 3, type: "tti", value: 5, img: "images/03_tti.jpg" },
+    { id: 10, month: 3, type: "tti", value: 5, dan: 'hong', img: "images/03_tti.jpg" },
     { id: 11, month: 3, type: "pi", value: 1, img: "images/03_pi.jpg" },
     { id: 12, month: 3, type: "pi", value: 1, img: "images/03_pi.jpg" },
-    { id: 13, month: 4, type: "tti", value: 5, img: "images/04_tti.jpg" },
+    { id: 13, month: 4, type: "tti", value: 5, dan: 'cho', img: "images/04_tti.jpg" },
     { id: 14, month: 4, type: "pi", value: 1, img: "images/04_pi.jpg" },
     { id: 15, month: 4, type: "pi", value: 1, img: "images/04_pi.jpg" },
     { id: 16, month: 4, type: "ggot", value: 10, img: "images/04_ggot.jpg" },
-    { id: 17, month: 5, type: "tti", value: 5, img: "images/05_tti.jpg" },
+    { id: 17, month: 5, type: "tti", value: 5, dan: 'cho', img: "images/05_tti.jpg" },
     { id: 18, month: 5, type: "pi", value: 1, img: "images/05_pi.jpg" },
     { id: 19, month: 5, type: "pi", value: 1, img: "images/05_pi.jpg" },
     { id: 20, month: 5, type: "ggot", value: 10, img: "images/05_ggot.jpg" },
-    { id: 21, month: 6, type: "tti", value: 5, img: "images/06_tti.jpg" },
+    { id: 21, month: 6, type: "tti", value: 5, dan: 'cheong', img: "images/06_tti.jpg" },
     { id: 22, month: 6, type: "pi", value: 1, img: "images/06_pi.jpg" },
     { id: 23, month: 6, type: "pi", value: 1, img: "images/06_pi.jpg" },
     { id: 24, month: 6, type: "ggot", value: 10, img: "images/06_ggot.jpg" },
-    { id: 25, month: 7, type: "tti", value: 5, img: "images/07_tti.jpg" },
+    { id: 25, month: 7, type: "tti", value: 5, dan: 'cho', img: "images/07_tti.jpg" },
     { id: 26, month: 7, type: "pi", value: 1, img: "images/07_pi.jpg" },
     { id: 27, month: 7, type: "pi", value: 1, img: "images/07_pi.jpg" },
     { id: 28, month: 7, type: "ggot", value: 10, img: "images/07_ggot.jpg" },
@@ -32,7 +32,7 @@ const CARDS = [
     { id: 30, month: 8, type: "pi", value: 1, img: "images/08_pi.jpg" },
     { id: 31, month: 8, type: "pi", value: 1, img: "images/08_pi.jpg" },
     { id: 32, month: 8, type: "ggot", value: 10, img: "images/08_ggot.jpg" },
-    { id: 33, month: 9, type: "tti", value: 5, img: "images/09_tti.jpg" },
+    { id: 33, month: 9, type: "tti", value: 5, dan: 'cheong', img: "images/09_tti.jpg" },
     { id: 34, month: 9, type: "pi", value: 1, img: "images/09_pi.jpg" },
     { id: 35, month: 9, type: "pi", value: 1, img: "images/09_pi.jpg" },
     { id: 36, month: 9, type: "ggot", value: 10, img: "images/09_ggot.jpg" },
@@ -58,6 +58,7 @@ let deck = [];
 let playerAcquired = [];
 let computerAcquired = [];
 let playerGoCount = 0; // 플레이어 고 횟수
+let computerGoCount = 0; // 컴퓨터 고 횟수
 let playerBombCount = 0; // 플레이어 폭탄 횟수
 let playerShakeCount = 0; // 플레이어 흔들기 횟수
 let tiedCards = []; // 뻑으로 묶인 카드
@@ -77,6 +78,8 @@ const stopButton = document.getElementById("stop-button");
 const statusMessage = document.getElementById("status-message");
 const playerScoreSpan = document.getElementById("player-score");
 const computerScoreSpan = document.getElementById("computer-score");
+const deckDiv = document.getElementById("deck");
+const flippedCardContainerDiv = document.getElementById("flipped-card-container");
 
 // 게임 초기화
 function initGame() {
@@ -157,9 +160,25 @@ function displayCards(cards, container, isPlayer) {
     });
 }
 
+// 뒤집은 카드 표시
+function displayFlippedCard(card) {
+    flippedCardContainerDiv.innerHTML = "";
+    if (card) {
+        const cardDiv = document.createElement("div");
+        cardDiv.classList.add("card");
+        cardDiv.style.backgroundImage = `url(${card.img})`;
+        cardDiv.dataset.id = card.id;
+        flippedCardContainerDiv.appendChild(cardDiv);
+    }
+}
+
 // 플레이어 턴
 function playerPlay(selectedCard) {
-    // 이미 선택 대기 중인 카드가 있으면 더 이상 진행하지 않음
+    if (goButton.style.display === 'inline-block') {
+        statusMessage.textContent = "'고' 또는 '스톱'을 선택해야 합니다.";
+        return;
+    }
+
     if (fieldDiv.querySelector('.selectable')) {
         return;
     }
@@ -169,106 +188,86 @@ function playerPlay(selectedCard) {
         (card) => card.month === selectedCard.month
     );
 
-    // 폭탄 가능 여부 확인
     if (cardsInHandSameMonth.length === 3 && matchingCardsInField.length > 0) {
         const wantsToBomb = confirm(`${selectedCard.month}월 패 3장으로 폭탄하시겠습니까?`);
         if (wantsToBomb) {
             handlePlayerBomb(cardsInHandSameMonth, matchingCardsInField);
-            return; // 폭탄 처리 후 함수 종료
+            return;
         }
     }
 
-    // 1. 플레이어가 손패에서 카드 내기
-    playerHand = playerHand.filter((c) => c.id !== selectedCard.id); // 손패에서 제거
+    playerHand = playerHand.filter((c) => c.id !== selectedCard.id);
 
-    // 2. 덱에서 카드 한 장 뒤집기
-    const flippedCard = deck.pop();
-    let matchingFlipped = [];
-    if (flippedCard) {
-        matchingFlipped = fieldCards.filter(
-            (card) => card.month === flippedCard.month
-        );
-    }
-
-    // 3. 뻑(설사) 확인 - 낸 패, 바닥의 1장, 뒤집은 패가 모두 같은 월일 때
-    if (matchingCardsInField.length === 1 && flippedCard &&
-        selectedCard.month === matchingCardsInField[0].month &&
-        selectedCard.month === flippedCard.month) {
-
-        statusMessage.textContent = `${selectedCard.month}월 뻑! 패가 묶였습니다.`;
-        tiedCards.push(selectedCard, matchingCardsInField[0], flippedCard);
-        fieldCards = fieldCards.filter(c => c.id !== matchingCardsInField[0].id); // 바닥에서 제거
-        updateBoard();
-        statusMessage.textContent = "컴퓨터 턴입니다.";
-        setTimeout(computerTurn, 1000);
-        return; // 뻑 발생 시 턴 종료
-    }
-
-    // 4. 뻑 해제 확인 (낸 패나 뒤집은 패가 뻑 패를 가져가는 경우)
-    if (tiedCards.length > 0 && tiedCards[0].month === selectedCard.month) {
-        acquireCards('player', selectedCard, ...tiedCards);
-        tiedCards = []; // 묶인 패 해제
-        statusMessage.textContent = `${selectedCard.month}월 뻑 패를 가져갑니다!`;
-    }
-    else if (flippedCard && tiedCards.length > 0 && tiedCards[0].month === flippedCard.month) {
-        acquireCards('player', flippedCard, ...tiedCards);
-        tiedCards = []; // 묶인 패 해제
-        statusMessage.textContent = `${flippedCard.month}월 뻑 패를 가져갑니다!`;
-    }
-    // 5. 일반 획득 (뻑이 아니거나 뻑 해제가 아닌 경우)
-    else {
-        if (matchingCardsInField.length === 3) { // 따닥
-            acquireCards('player', selectedCard, ...matchingCardsInField);
-        } else if (matchingCardsInField.length === 1) { // 한 장 매칭
+    // 1. 낸 카드를 먼저 처리
+    let isPlayerChoiceNeeded = false;
+    if (matchingCardsInField.length === 1) {
+        const flippedCard = deck.pop();
+        displayFlippedCard(flippedCard);
+        if (flippedCard && selectedCard.month === flippedCard.month) {
+            statusMessage.textContent = `${selectedCard.month}월 뻑! 패가 묶였습니다.`;
+            tiedCards.push(selectedCard, matchingCardsInField[0], flippedCard);
+            fieldCards = fieldCards.filter(c => c.id !== matchingCardsInField[0].id);
+        } else {
             acquireCards('player', selectedCard, matchingCardsInField[0]);
-        } else if (matchingCardsInField.length > 1) { // 여러 장 매칭 (플레이어 선택)
-            statusMessage.textContent = "바닥에 깔린 카드 중 하나를 선택하세요.";
-            matchingCardsInField.forEach(card => {
-                const cardDiv = fieldDiv.querySelector(`[data-id='${card.id}']`);
-                if (cardDiv) {
-                    cardDiv.classList.add('selectable');
-                    cardDiv.onclick = () => {
-                        acquireCards('player', selectedCard, card);
-                        // Clear selectable state
-                        fieldDiv.querySelectorAll('.selectable').forEach(div => {
-                            div.classList.remove('selectable');
-                            const newDiv = div.cloneNode(true);
-                            div.parentNode.replaceChild(newDiv, div);
-                        });
-                        // Flipped card logic after player selection
-                        if (flippedCard) {
-                            if (matchingFlipped.length > 0) {
-                                acquireCards('player', flippedCard, ...matchingFlipped);
-                            } else {
-                                fieldCards.push(flippedCard);
-                            }
-                        }
-                        updateBoard();
-                        statusMessage.textContent = "컴퓨터 턴입니다.";
-                        setTimeout(computerTurn, 1000);
-                    };
-                }
-            });
-            return; // 플레이어 선택 대기
-        } else { // 매칭되는 패 없음
-            fieldCards.push(selectedCard);
+            if (flippedCard) handleFlippedCard('player', flippedCard);
         }
-
-        // 뒤집은 패 처리 (뻑 해제가 아니었고, 아직 처리되지 않았다면)
-        if (flippedCard && tiedCards.length === 0) { // tiedCards.length === 0 ensures it wasn't part of a 뻑 or just released a 뻑
-            if (matchingFlipped.length > 0) {
-                acquireCards('player', flippedCard, ...matchingFlipped);
-            } else {
-                fieldCards.push(flippedCard);
+    } else if (matchingCardsInField.length > 1) {
+        isPlayerChoiceNeeded = true;
+        statusMessage.textContent = "바닥에 깔린 카드 중 하나를 선택하세요.";
+        matchingCardsInField.forEach(card => {
+            const cardDiv = fieldDiv.querySelector(`[data-id='${card.id}']`);
+            if (cardDiv) {
+                cardDiv.classList.add('selectable');
+                cardDiv.onclick = () => {
+                    acquireCards('player', selectedCard, card);
+                    fieldDiv.querySelectorAll('.selectable').forEach(div => {
+                        div.classList.remove('selectable');
+                        const newDiv = div.cloneNode(true);
+                        div.parentNode.replaceChild(newDiv, div);
+                    });
+                    const flippedCard = deck.pop();
+                    displayFlippedCard(flippedCard);
+                    if (flippedCard) handleFlippedCard('player', flippedCard);
+                    endPlayerTurn();
+                };
             }
-        }
+        });
+    } else {
+        fieldCards.push(selectedCard);
+        const flippedCard = deck.pop();
+        displayFlippedCard(flippedCard);
+        if (flippedCard) handleFlippedCard('player', flippedCard);
     }
 
-    // 턴 종료 및 보드 업데이트 (플레이어 선택 대기 중이 아니라면)
-    if (!fieldDiv.querySelector('.selectable')) {
-        updateBoard();
+    if (!isPlayerChoiceNeeded) {
+        endPlayerTurn();
+    }
+}
+
+function handleFlippedCard(turn, flippedCard) {
+    const matchingField = fieldCards.filter(c => c.month === flippedCard.month);
+    if (matchingField.length > 0) {
+        acquireCards(turn, flippedCard, ...matchingField);
+    } else {
+        fieldCards.push(flippedCard);
+    }
+}
+
+function endPlayerTurn() {
+    updateBoard();
+    const playerScoreInfo = calculateScore(playerAcquired);
+    playerScore = playerScoreInfo.score;
+
+    if (playerScore >= 3) {
+        statusMessage.textContent = `현재 ${playerScore}점. 고 또는 스톱을 선택하세요.`;
+        goButton.style.display = 'inline-block';
+        stopButton.style.display = 'inline-block';
+    } else {
         statusMessage.textContent = "컴퓨터 턴입니다.";
-        setTimeout(computerTurn, 1000);
+        setTimeout(() => {
+            displayFlippedCard(null);
+            computerTurn();
+        }, 1000);
     }
 }
 
@@ -293,6 +292,7 @@ function handlePlayerBomb(bombSet, matchingFieldCards) {
 
                 // 뒤집는 로직
                 const flippedCard = deck.pop();
+                displayFlippedCard(flippedCard);
                 if (flippedCard) {
                     const matchingFlipped = fieldCards.filter(
                         (c) => c.month === flippedCard.month
@@ -303,9 +303,7 @@ function handlePlayerBomb(bombSet, matchingFieldCards) {
                         fieldCards.push(flippedCard);
                     }
                 }
-                updateBoard();
-                statusMessage.textContent = "컴퓨터 턴입니다.";
-                setTimeout(computerTurn, 1000);
+                endPlayerTurn();
             };
         }
     });
@@ -341,26 +339,28 @@ function computerTurn() {
         if (matchingCardsInField.length > 0) {
             for (const fieldCard of matchingCardsInField) {
                 const tempAcquired = [...computerAcquired, cardInHand, fieldCard];
-                const score = calculateScore(tempAcquired);
+                const scoreInfo = calculateScore(tempAcquired);
 
-                if (score > bestMove.score) {
-                    bestMove = { card: cardInHand, fieldCard: fieldCard, score: score };
+                if (scoreInfo.score > bestMove.score) {
+                    bestMove = { card: cardInHand, fieldCard: fieldCard, score: scoreInfo.score };
                 }
             }
         }
     }
 
+    const flippedCard = deck.pop();
+    displayFlippedCard(flippedCard);
+
     if (bestMove.card) {
         // 뻑(설사) 확인 (컴퓨터) - 낸 패, 바닥의 1장, 뒤집을 패가 모두 같은 월일 때
         const matchingCardsForBestMove = fieldCards.filter(c => c.month === bestMove.card.month);
-        const flippedCardForBestMove = deck[deck.length - 1]; // 뒤집을 카드 미리보기
 
-        if (matchingCardsForBestMove.length === 1 && flippedCardForBestMove &&
+        if (matchingCardsForBestMove.length === 1 && flippedCard &&
             bestMove.card.month === matchingCardsForBestMove[0].month &&
-            bestMove.card.month === flippedCardForBestMove.month) {
+            bestMove.card.month === flippedCard.month) {
 
             statusMessage.textContent = `${bestMove.card.month}월 뻑! 패가 묶였습니다.`;
-            tiedCards.push(bestMove.card, matchingCardsForBestMove[0], deck.pop());
+            tiedCards.push(bestMove.card, matchingCardsForBestMove[0], flippedCard);
             fieldCards = fieldCards.filter(c => c.id !== matchingCardsForBestMove[0].id);
             computerHand = computerHand.filter(c => c.id !== bestMove.card.id);
             updateBoard();
@@ -382,7 +382,6 @@ function computerTurn() {
         computerHand = computerHand.filter(c => c.id !== randomCard.id);
     }
 
-    const flippedCard = deck.pop();
     if (flippedCard) {
         // 뻑 해제 확인 (뒤집은 패가 뻑 패를 가져가는 경우)
         if (tiedCards.length > 0 && tiedCards[0].month === flippedCard.month) {
@@ -404,25 +403,35 @@ function computerTurn() {
 
     updateBoard();
     statusMessage.textContent = "플레이어 턴입니다.";
-    checkGameOver();
+    setTimeout(() => {
+        displayFlippedCard(null);
+        checkGameOver();
+    }, 1000);
 }
 
 // 점수 계산
-function calculateScore(acquiredCards) {
-    if (!acquiredCards) return 0;
+function calculateScore(acquiredCards, turn) {
+    if (!acquiredCards) return { score: 0, breakdown: [] };
+
     let score = 0;
+    let breakdown = [];
     const gwang = acquiredCards.filter(c => c.type === 'gwang');
     const tti = acquiredCards.filter(c => c.type === 'tti');
     const ggot = acquiredCards.filter(c => c.type === 'ggot');
     const pi = acquiredCards.filter(c => c.type === 'pi' || c.type === 'ssangpi');
 
+    // 광 점수
     if (gwang.length >= 3) {
-        score += gwang.length === 3 ? 3 : gwang.length === 4 ? 4 : 20;
+        const gwangScore = gwang.length === 3 ? 3 : gwang.length === 4 ? 4 : 20;
+        score += gwangScore;
+        breakdown.push(`광 (${gwangScore}점)`);
     }
 
     // 띠 점수
     if (tti.length >= 5) {
-        score += tti.length;
+        const ttiScore = tti.length - 4;
+        score += ttiScore;
+        breakdown.push(`띠 (${ttiScore}점)`);
     }
 
     // 단(Dan) 족보 점수
@@ -431,51 +440,57 @@ function calculateScore(acquiredCards) {
     const chodan = tti.filter(c => c.dan === 'cho');
 
     if (hongdan.length === 3) {
-        score += 3; // 홍단 3점
+        score += 3;
+        breakdown.push("홍단 (3점)");
     }
     if (cheongdan.length === 3) {
-        score += 3; // 청단 3점
+        score += 3;
+        breakdown.push("청단 (3점)");
     }
     if (chodan.length === 3) {
-        score += 3; // 초단 3점
+        score += 3;
+        breakdown.push("초단 (3점)");
     }
 
+    // 끗(동물) 점수
+    const godoriMonths = [2, 4, 8];
+    const godoriCards = ggot.filter(c => godoriMonths.includes(c.month));
+    if (godoriCards.length === 3) {
+        score += 5;
+        breakdown.push("고도리 (5점)");
+    }
     if (ggot.length >= 5) {
         score += ggot.length;
+        breakdown.push(`끗 (${ggot.length}점)`);
     }
 
+    // 피 점수
     const piCount = pi.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : 1), 0);
     if (piCount >= 10) {
-        score += piCount - 9;
+        const piScore = piCount - 9;
+        score += piScore;
+        breakdown.push(`피 (${piScore}점)`);
     }
 
-    // 흔들기 점수 2배
-    if (playerShakeCount > 0) {
-        score *= 2;
-    }
-
-    return score;
+    return { score, breakdown };
 }
 
 // "고" 버튼 클릭
 goButton.addEventListener('click', () => {
-    playerScore = calculateScore(playerAcquired);
-    if (playerScore >= 3) {
-        playerGoCount++;
-        statusMessage.textContent = `플레이어 ${playerGoCount}고! 컴퓨터 턴입니다.`;
-        // "고"를 하면 스톱을 못하게 막는 로직 (선택적)
-        // goButton.disabled = true;
-        // stopButton.disabled = true;
-        setTimeout(computerTurn, 1000);
-    } else {
-        statusMessage.textContent = "3점 이상부터 '고'를 할 수 있습니다.";
-    }
+    playerGoCount++;
+    statusMessage.textContent = `플레이어 ${playerGoCount}고! 컴퓨터 턴입니다.`;
+    goButton.style.display = 'none';
+    stopButton.style.display = 'none';
+    setTimeout(computerTurn, 1000);
 });
 
 // "스톱" 버튼 클릭
 stopButton.addEventListener('click', () => {
-    let finalPlayerScore = calculateScore(playerAcquired);
-    const finalComputerScore = calculateScore(computerAcquired);
+    let playerResult = calculateScore(playerAcquired, 'player');
+    let computerResult = calculateScore(computerAcquired, 'computer');
+
+    let finalPlayerScore = playerResult.score;
+    let finalComputerScore = computerResult.score;
 
     // 승패 판정
     if (finalPlayerScore > finalComputerScore) {
@@ -483,22 +498,26 @@ stopButton.addEventListener('click', () => {
         const computerPiCount = computerAcquired.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : (cur.type === 'pi' ? 1 : 0)), 0);
         if (computerPiCount < 5) {
             finalPlayerScore *= 2;
-            statusMessage.textContent = "피박! 점수 2배!";
+            playerResult.breakdown.push("피박 (점수 2배)");
         }
 
         // 고박 확인
         if (playerGoCount > 0 && finalComputerScore === 0) {
-            finalPlayerScore *= 2; // 고박 규칙은 다양함 (점수 2배 적용)
-            statusMessage.textContent = "고박! 점수 2배!";
+            finalPlayerScore *= 2;
+            playerResult.breakdown.push("고박 (점수 2배)");
         }
-        alert(`플레이어 승리! 최종 점수: ${finalPlayerScore}점`);
+        // 흔들기/폭탄 배율 적용
+        const multiplier = Math.pow(2, playerShakeCount + playerBombCount);
+        if (multiplier > 1) {
+             finalPlayerScore *= multiplier;
+             if(playerShakeCount > 0) playerResult.breakdown.push(`흔들기 (${playerShakeCount}회, 점수 ${Math.pow(2, playerShakeCount)}배)`);
+             if(playerBombCount > 0) playerResult.breakdown.push(`폭탄 (${playerBombCount}회, 점수 ${Math.pow(2, playerBombCount)}배)`);
+        }
+
+        alert(`플레이어 승리!\n\n최종 점수: ${finalPlayerScore}점\n\n점수 내역:\n- ${playerResult.breakdown.join('\n- ')}\n\n---\n\n컴퓨터 점수: ${finalComputerScore}점\n- ${computerResult.breakdown.join('\n- ') || '점수 없음'}`);
+
     } else if (finalComputerScore > finalPlayerScore) {
-        // 컴퓨터 승리
-        // 플레이어 고박 확인 (컴퓨터가 이겼는데 플레이어가 고를 했고 점수가 0점일 경우)
-        if (computerGoCount > 0 && finalPlayerScore === 0) {
-            finalComputerScore *= 2; // 고박 규칙 적용
-            statusMessage.textContent = "컴퓨터 고박! 점수 2배!";
-        }
+        // 컴퓨터 승리 로직 (유사하게 적용 가능)
         alert(`컴퓨터 승리! 최종 점수: ${finalComputerScore}점`);
     } else {
         alert("무승부!");
@@ -600,8 +619,17 @@ function updateBoard() {
     displayAcquiredCardsGrouped(playerAcquired, playerAcquiredDiv);
     displayAcquiredCardsGrouped(computerAcquired, computerAcquiredDiv);
 
-    playerScore = calculateScore(playerAcquired);
-    computerScore = calculateScore(computerAcquired);
+    const deckCard = deckDiv.querySelector('.card');
+    if (deck.length > 0) {
+        if(deckCard) deckCard.style.display = 'block';
+    } else {
+        if(deckCard) deckCard.style.display = 'none';
+    }
+
+    const playerScoreInfo = calculateScore(playerAcquired, 'player');
+    const computerScoreInfo = calculateScore(computerAcquired, 'computer');
+    playerScore = playerScoreInfo.score;
+    computerScore = computerScoreInfo.score;
     playerScoreSpan.textContent = playerScore;
     computerScoreSpan.textContent = computerScore;
 }

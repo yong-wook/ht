@@ -38,7 +38,7 @@ h1 {
     box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 
-.hand-area, .field {
+.hand-area {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -49,9 +49,42 @@ h1 {
     min-width: 300px;
 }
 
-.field {
+.center-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     flex-grow: 1;
     margin: 0 20px;
+}
+
+.field {
+    width: 100%;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #3a734d;
+}
+
+.deck-area {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+#deck {
+    margin-right: 10px;
+}
+
+#flipped-card-container {
+    min-width: 60px; /* 카드 하나가 들어갈 정도의 너비 */
+    min-height: 90px; /* 카드 하나가 들어갈 정도의 높이 */
+    border: 1px dashed #ccc;
+    border-radius: 5px;
 }
 
 h2, h3 {
@@ -102,6 +135,11 @@ h2, h3 {
     background-color: white;
     background-size: cover;
     cursor: pointer;
+}
+
+#deck .card {
+    background-color: red;
+    background-image: none;
 }
 
 
