@@ -151,3 +151,40 @@ h2, h3 {
     border: 2px solid yellow;
     cursor: pointer;
 }
+
+#go-button, #stop-button {
+    display: none; /* 초기에는 숨김 */
+    margin: 0 10px;
+    padding: 10px 20px;
+    font-size: 16px;
+}
+
+.card.back {
+    background-color: blue;
+    background-image: none;
+}
+
+.tied-cards-container {
+    position: relative;
+    width: 60px; 
+    height: 90px;
+    margin: 5px;
+}
+
+.tied-cards-container .card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+.tied-cards-container .card:nth-child(2) {
+    transform: translate(5px, 5px);
+}
+
+.tied-cards-container .card:nth-child(3) {
+    transform: translate(10px, 10px);
+}

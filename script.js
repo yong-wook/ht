@@ -89,6 +89,11 @@ function initGame() {
 	shuffleDeck();
 	// 카드 분배
 	dealCards();
+
+    // 총통 확인
+    if (checkChongtong()) {
+        return; // 총통으로 게임이 즉시 종료됨
+    }
 	
     // 흔들기 확인
     const shakeMonth = playerHand.find(card => playerHand.filter(c => c.month === card.month).
@@ -104,6 +109,41 @@ function initGame() {
     // 화면 업데이트
 	updateBoard();
     statusMessage.textContent = "플레이어 턴입니다.";
+}
+
+function checkChongtong() {
+    const checkHand = (hand, playerName, scoreTarget) => {
+        const monthCounts = {};
+        for (const card of hand) {
+            monthCounts[card.month] = (monthCounts[card.month] || 0) + 1;
+        }
+
+        for (const month in monthCounts) {
+            if (monthCounts[month] === 4) {
+                updateBoard(); // 카드를 보여주고
+                const score = 5; // 총통 점수
+                if (scoreTarget === 'player') {
+                    playerScore += score;
+                } else {
+                    computerScore += score;
+                }
+                alert(`${playerName} 총통! ${month}월 패 4장으로 승리! (+${score}점)`);
+                updateBoard(); // 점수 업데이트 반영
+                endRound();
+                return true; // 총통 발견
+            }
+        }
+        return false; // 총통 없음
+    };
+
+    if (checkHand(playerHand, "플레이어", 'player')) {
+        return true;
+    }
+    if (checkHand(computerHand, "컴퓨터", 'computer')) {
+        return true;
+    }
+
+    return false;
 }
 
 // 덱 생성
@@ -181,6 +221,22 @@ function playerPlay(selectedCard) {
 
     if (fieldDiv.querySelector('.selectable')) {
         return;
+    }
+
+    // 뻑 해제 로직
+    if (tiedCards.length > 0 && selectedCard.month === tiedCards[0].month) {
+        playerHand = playerHand.filter((c) => c.id !== selectedCard.id);
+        acquireCards('player', selectedCard, ...tiedCards);
+        tiedCards = []; // 묶인 패 해제
+        statusMessage.textContent = `${selectedCard.month}월 뻑 패를 가져갑니다!`
+
+        const flippedCard = deck.pop();
+        displayFlippedCard(flippedCard);
+        if (flippedCard) {
+            handleFlippedCard('player', flippedCard);
+        }
+        endPlayerTurn();
+        return; // 턴 종료
     }
 
     const cardsInHandSameMonth = playerHand.filter(c => c.month === selectedCard.month);
@@ -460,8 +516,9 @@ function calculateScore(acquiredCards, turn) {
         breakdown.push("고도리 (5점)");
     }
     if (ggot.length >= 5) {
-        score += ggot.length;
-        breakdown.push(`끗 (${ggot.length}점)`);
+        const ggotScore = ggot.length - 4;
+        score += ggotScore;
+        breakdown.push(`끗 (${ggotScore}점)`);
     }
 
     // 피 점수
@@ -494,11 +551,23 @@ stopButton.addEventListener('click', () => {
 
     // 승패 판정
     if (finalPlayerScore > finalComputerScore) {
-        // 피박 확인
+        // 승리자: 플레이어
+        const hasPlayerScoredWithPi = playerResult.breakdown.some(b => b.startsWith('피'));
+        const hasPlayerScoredWithGwang = playerResult.breakdown.some(b => b.startsWith('광'));
+        
         const computerPiCount = computerAcquired.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : (cur.type === 'pi' ? 1 : 0)), 0);
-        if (computerPiCount < 5) {
+        const computerGwangCount = computerAcquired.filter(c => c.type === 'gwang').length;
+
+        // 피박 확인: 플레이어가 피로 점수를 냈고, 컴퓨터의 피가 5장 미만일 때
+        if (hasPlayerScoredWithPi && computerPiCount < 5) {
             finalPlayerScore *= 2;
             playerResult.breakdown.push("피박 (점수 2배)");
+        }
+
+        // 광박 확인: 플레이어가 광으로 점수를 냈고, 컴퓨터가 광을 한 장도 못 먹었을 때
+        if (hasPlayerScoredWithGwang && computerGwangCount === 0) {
+            finalPlayerScore *= 2;
+            playerResult.breakdown.push("광박 (점수 2배)");
         }
 
         // 고박 확인
@@ -517,8 +586,28 @@ stopButton.addEventListener('click', () => {
         alert(`플레이어 승리!\n\n최종 점수: ${finalPlayerScore}점\n\n점수 내역:\n- ${playerResult.breakdown.join('\n- ')}\n\n---\n\n컴퓨터 점수: ${finalComputerScore}점\n- ${computerResult.breakdown.join('\n- ') || '점수 없음'}`);
 
     } else if (finalComputerScore > finalPlayerScore) {
-        // 컴퓨터 승리 로직 (유사하게 적용 가능)
-        alert(`컴퓨터 승리! 최종 점수: ${finalComputerScore}점`);
+        // 승리자: 컴퓨터
+        const hasComputerScoredWithPi = computerResult.breakdown.some(b => b.startsWith('피'));
+        const hasComputerScoredWithGwang = computerResult.breakdown.some(b => b.startsWith('광'));
+
+        const playerPiCount = playerAcquired.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : (cur.type === 'pi' ? 1 : 0)), 0);
+        const playerGwangCount = playerAcquired.filter(c => c.type === 'gwang').length;
+
+        // 피박 확인
+        if (hasComputerScoredWithPi && playerPiCount < 5) {
+            finalComputerScore *= 2;
+            computerResult.breakdown.push("피박 (점수 2배)");
+        }
+
+        // 광박 확인
+        if (hasComputerScoredWithGwang && playerGwangCount === 0) {
+            finalComputerScore *= 2;
+            computerResult.breakdown.push("광박 (점수 2배)");
+        }
+        
+        // 컴퓨터는 '고'를 하지 않으므로 고박은 없음.
+
+        alert(`컴퓨터 승리!\n\n최종 점수: ${finalComputerScore}점\n\n점수 내역:\n- ${computerResult.breakdown.join('\n- ')}\n\n---\n\n플레이어 점수: ${finalPlayerScore}점\n- ${playerResult.breakdown.join('\n- ') || '점수 없음'}`);
     } else {
         alert("무승부!");
     }
@@ -615,7 +704,33 @@ function updateBoard() {
 
     displayCards(playerHand, playerHandDiv, true);
     displayCards(computerHand, computerHandDiv, false);
-    displayCards(fieldCards, fieldDiv, false);
+
+    // Render field cards with special handling for tied cards
+    fieldDiv.innerHTML = ''; // Clear the field first
+
+    // Display tied cards (뻑)
+    if (tiedCards.length > 0) {
+        const tiedCardsDiv = document.createElement('div');
+        tiedCardsDiv.classList.add('tied-cards-container');
+        tiedCards.forEach(card => {
+            const cardDiv = document.createElement("div");
+            cardDiv.classList.add("card");
+            cardDiv.style.backgroundImage = `url(${card.img})`;
+            cardDiv.dataset.id = card.id;
+            tiedCardsDiv.appendChild(cardDiv);
+        });
+        fieldDiv.appendChild(tiedCardsDiv);
+    }
+
+    // Display normal field cards
+    fieldCards.forEach((card) => {
+        const cardDiv = document.createElement("div");
+        cardDiv.classList.add("card");
+        cardDiv.style.backgroundImage = `url(${card.img})`;
+        cardDiv.dataset.id = card.id;
+        fieldDiv.appendChild(cardDiv);
+    });
+    
     displayAcquiredCardsGrouped(playerAcquired, playerAcquiredDiv);
     displayAcquiredCardsGrouped(computerAcquired, computerAcquiredDiv);
 
