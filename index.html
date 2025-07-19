@@ -8,46 +8,77 @@
 </head>
 <body>
     <h1>고스톱</h1>
-    <div id="status-message" class="status-message"></div>
-    <div id="scoreboard" class="scoreboard">
-        <div>플레이어 점수: <span id="player-score">0</span></div>
-        <div>컴퓨터 점수: <span id="computer-score">0</span></div>
+    <div id="stage-selection" class="stage-selection">
+        <h2>스테이지 선택</h2>
+        <div id="stage-container" class="stage-container">
+            <!-- 스테이지 캐릭터들이 여기에 동적으로 추가됩니다. -->
+        </div>
     </div>
-    <div id="game-board" class="game-board">
-        <div id="computer-hand" class="hand-area">
-            <h2>컴퓨터</h2>
-            <div class="card-container"></div>
-            <div class="acquired-cards">
-                <h3>획득한 패</h3>
-                <div class="card-container"></div>
+
+    <div id="game-container" style="display: none;">
+        <div id="status-message" class="status-message"></div>
+        <div id="scoreboard" class="scoreboard">
+            <div>
+                <span>플레이어</span>
+                <div>점수: <span id="player-score">0</span></div>
+                <div>판돈: <span id="player-money">0</span>원</div>
+            </div>
+            <div>
+                <span>컴퓨터</span>
+                <div>점수: <span id="computer-score">0</span></div>
+                <div>판돈: <span id="computer-money">0</span>원</div>
             </div>
         </div>
-        <div class="center-area">
-            <div id="field" class="field">
-                <h2>판</h2>
+        <div id="game-board" class="game-board">
+            <div id="computer-hand" class="hand-area">
+                <h2>컴퓨터</h2>
                 <div class="card-container"></div>
-            </div>
-            <div id="deck-area" class="deck-area">
-                <h2>더미</h2>
-                <div id="deck" class="card-container">
-                    <div class="card back"></div>
+                <div class="acquired-cards">
+                    <h3>획득한 패</h3>
+                    <div class="card-container"></div>
                 </div>
-                <div id="flipped-card-container" class="card-container"></div>
             </div>
-        </div>
-        <div id="player-hand" class="hand-area">
-            <h2>플레이어</h2>
-            <div class="card-container"></div>
-             <div class="acquired-cards">
-                <h3>획득한 패</h3>
+            <div class="center-area">
+                <div id="field" class="field">
+                    <h2>판</h2>
+                    <div class="card-container"></div>
+                </div>
+                <div id="deck-area" class="deck-area">
+                    <h2>더미</h2>
+                    <div id="deck" class="card-container">
+                        <div class="card back"></div>
+                    </div>
+                    <div id="flipped-card-container" class="card-container"></div>
+                </div>
+            </div>
+            <div id="player-hand" class="hand-area">
+                <h2>플레이어</h2>
                 <div class="card-container"></div>
+                 <div class="acquired-cards">
+                    <h3>획득한 패</h3>
+                    <div class="card-container"></div>
+                </div>
             </div>
         </div>
+        <div id="controls" class="controls">
+            <button id="go-button">고</button>
+            <button id="stop-button">스톱</button>
+        </div>
     </div>
-    <div id="controls" class="controls">
-        <button id="go-button">고</button>
-        <button id="stop-button">스톱</button>
+    <div id="roulette-container" class="roulette-container" style="display: none;">
+        <div class="roulette-wheel">
+            <canvas id="roulette-canvas" width="300" height="300"></canvas>
+        </div>
+        <button id="spin-button">룰렛 돌리기</button>
     </div>
-    <script src="script.js"></script>
+    <div id="showtime-container" class="showtime-container" style="display: none;">
+        <h2>쇼타임!</h2>
+        <div class="showtime-image-wrapper">
+            <img id="showtime-image" src="" alt="Showtime Character">
+        </div>
+        <p>상대방의 판돈이 모두 소진되었습니다!</p>
+        <button id="showtime-return-button">스테이지 선택으로 돌아가기</button>
+    </div>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
