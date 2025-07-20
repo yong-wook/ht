@@ -45,19 +45,26 @@ function drawRoulette() {
         ctx.restore();
     });
 
-    ctx.restore();
-
-    // 화살표 그리기
-    ctx.beginPath();
-    ctx.moveTo(centerX + radius + 10, centerY);
-    ctx.lineTo(centerX + radius + 25, centerY - 10);
-    ctx.lineTo(centerX + radius + 25, centerY + 10);
-    ctx.closePath();
-    ctx.fillStyle = 'red';
-    ctx.fill();
+    // 당첨 지시자 그리기
+    drawIndicator();
 }
 
-// 룰렛 돌리기
+// 당첨 지시자를 그리는 함수
+function drawIndicator() {
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(-Math.PI / 2); // 캔버스 상단 중앙을 가리키도록 회전
+
+    ctx.beginPath();
+    ctx.moveTo(0, -radius - 20); // 룰렛 원 바깥쪽 상단
+    ctx.lineTo(-10, -radius - 5); // 왼쪽 아래
+    ctx.lineTo(10, -radius - 5);  // 오른쪽 아래
+    ctx.closePath();
+    ctx.fillStyle = 'red'; // 지시자 색상
+    ctx.fill();
+    ctx.restore();
+}
+
 function spinRoulette() {
     if (isSpinning) return;
     isSpinning = true;
