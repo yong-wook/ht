@@ -108,24 +108,38 @@ export function updateBoard(gameState, playerPlayCallback) {
 
     fieldDiv.innerHTML = '';
     if (tiedCards.length > 0) {
-        const tiedCardsDiv = document.createElement('div');
-        tiedCardsDiv.classList.add('tied-cards-container');
-        tiedCards.forEach(card => {
+        // tiedCards가 2차원 배열이라고 가정하고 각 묶음을 별도의 컨테이너에 표시
+        tiedCards.forEach(tiedGroup => {
+            const tiedCardsDiv = document.createElement('div');
+            tiedCardsDiv.classList.add('tied-cards-container');
+            tiedGroup.forEach(card => {
+                const cardDiv = document.createElement("div");
+                cardDiv.classList.add("card");
+                cardDiv.style.backgroundImage = `url(${card.img})`;
+                cardDiv.dataset.id = card.id;
+                tiedCardsDiv.appendChild(cardDiv);
+            });
+            fieldDiv.appendChild(tiedCardsDiv);
+        });
+    }
+
+    // 월별로 카드 그룹화하여 표시
+    const groupedFieldCards = fieldCards.reduce((acc, card) => {
+        (acc[card.month] = acc[card.month] || []).push(card);
+        return acc;
+    }, {});
+
+    Object.values(groupedFieldCards).forEach(group => {
+        const groupContainer = document.createElement('div');
+        groupContainer.classList.add('field-card-group');
+        group.forEach(card => {
             const cardDiv = document.createElement("div");
             cardDiv.classList.add("card");
             cardDiv.style.backgroundImage = `url(${card.img})`;
             cardDiv.dataset.id = card.id;
-            tiedCardsDiv.appendChild(cardDiv);
+            groupContainer.appendChild(cardDiv);
         });
-        fieldDiv.appendChild(tiedCardsDiv);
-    }
-
-    fieldCards.forEach((card) => {
-        const cardDiv = document.createElement("div");
-        cardDiv.classList.add("card");
-        cardDiv.style.backgroundImage = `url(${card.img})`;
-        cardDiv.dataset.id = card.id;
-        fieldDiv.appendChild(cardDiv);
+        fieldDiv.appendChild(groupContainer);
     });
 
     displayAcquiredCardsGrouped(playerAcquired, playerAcquiredDiv);

@@ -39,9 +39,20 @@ function drawRoulette() {
         ctx.save();
         ctx.rotate(startAngle + arc / 2);
         ctx.fillStyle = 'white';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'right';
-        ctx.fillText(item.name, radius - 5, 5);
+        ctx.font = 'bold 16px Arial'; // 폰트 크기 및 굵기 조정
+        ctx.textAlign = 'center'; // 중앙 정렬
+        ctx.textBaseline = 'middle'; // 세로 중앙 정렬
+
+        // 텍스트를 여러 줄로 나누어 그리기
+        const lines = item.name.split(' ');
+        const lineHeight = 20;
+        const textX = radius / 2 + 15; // 원의 중심에서 3/4 지점
+
+        lines.forEach((line, i) => {
+            const textY = -(lineHeight * (lines.length -1) / 2) + (i * lineHeight);
+            ctx.fillText(line, textX, textY);
+        });
+
         ctx.restore();
     });
 
@@ -62,6 +73,7 @@ function drawIndicator() {
     ctx.closePath();
     ctx.fillStyle = 'red'; // 지시자 색상
     ctx.fill();
+    ctx.restore();
     ctx.restore();
 }
 
@@ -95,19 +107,12 @@ function spinRoulette() {
 
 // 당첨 아이템 결정
 function determineWinner() {
-    const normalizedRotation = (currentRotation + Math.PI * 2) % (Math.PI * 2); // 0 ~ 2PI
-    const anglePerItem = Math.PI * 2 / ROULETTE_ITEMS.length;
-    
-    // 화살표가 가리키는 각도 보정 (화살표가 룰렛의 오른쪽에 있으므로)
-    const pointerAngle = (Math.PI * 2 - normalizedRotation + Math.PI / 2) % (Math.PI * 2);
+    const totalAngle = 360;
+    const arc = totalAngle / ROULETTE_ITEMS.length;
+    const stoppingAngle = (currentRotation * 180 / Math.PI) % totalAngle;
+    const correctedAngle = (totalAngle - stoppingAngle + 270) % totalAngle;
+    const winningIndex = Math.floor(correctedAngle / arc);
 
-    let winningIndex = 0;
-    for (let i = 0; i < ROULETTE_ITEMS.length; i++) {
-        if (pointerAngle >= (i * anglePerItem) && pointerAngle < ((i + 1) * anglePerItem)) {
-            winningIndex = i;
-            break;
-        }
-    }
     const winningItem = ROULETTE_ITEMS[winningIndex];
     alert(`축하합니다! ${winningItem.name}에 당첨되셨습니다!`);
     if (onSpinCompleteCallback) {

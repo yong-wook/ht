@@ -9,7 +9,7 @@ export let playerGoCount = 0;
 export let computerGoCount = 0;
 export let playerBombCount = 0;
 export let playerShakeCount = 0;
-export let tiedCards = []; // 뻑으로 묶인 카드
+export let tiedCards = []; // 뻑으로 묶인 카드 그룹 (2차원 배열)
 export let playerScore = 0;
 export let computerScore = 0;
 
@@ -218,6 +218,15 @@ export function updateComputerScore() {
     const scoreInfo = calculateScore(computerAcquired);
     computerScore = scoreInfo.score;
     return scoreInfo;
+}
+
+// 점수 직접 설정 함수
+export function setPlayerScore(score) {
+    playerScore = score;
+}
+
+export function setComputerScore(score) {
+    computerScore = score;
 }
 
 // 상태 변수를 업데이트하는 함수들

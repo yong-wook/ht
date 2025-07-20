@@ -99,6 +99,14 @@ h2, h3 {
     min-height: 80px;
 }
 
+.field-card-group {
+    display: flex;
+    margin: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 5px;
+    padding: 5px;
+}
+
 .acquired-cards {
     width: 100%;
     margin-top: 10px;
