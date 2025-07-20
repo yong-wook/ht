@@ -23,7 +23,7 @@ export function displayCards(cards, container, isPlayer, playerPlayCallback) {
         if (container === computerHandDiv) {
             cardDiv.style.backgroundColor = 'red'; // 컴퓨터 패는 빨간색
         } else {
-            cardDiv.style.backgroundImage = `url(${card.img})`;
+            cardDiv.style.backgroundImage = `url(images/cards/${card.img.split('/').pop()})`;
         }
         cardDiv.dataset.id = card.id;
         if (isPlayer) {
@@ -39,7 +39,7 @@ export function displayFlippedCard(card) {
     if (card) {
         const cardDiv = document.createElement("div");
         cardDiv.classList.add("card");
-        cardDiv.style.backgroundImage = `url(${card.img})`;
+        cardDiv.style.backgroundImage = `url(images/cards/${card.img.split('/').pop()})`;
         cardDiv.dataset.id = card.id;
         flippedCardContainerDiv.appendChild(cardDiv);
     }
@@ -87,7 +87,7 @@ export function displayAcquiredCardsGrouped(cards, container) {
                 if (card.id === 999 || card.id === 998) { // 임시 ID로 보너스 카드 구분
                     cardDiv.classList.add('bonus-card');
                 }
-                cardDiv.style.backgroundImage = `url(${card.img})`;
+                cardDiv.style.backgroundImage = `url(images/cards/${card.img.split('/').pop()})`;
                 cardDiv.dataset.id = card.id;
                 groupCardContainer.appendChild(cardDiv);
             });
@@ -115,7 +115,7 @@ export function updateBoard(gameState, playerPlayCallback) {
             tiedGroup.forEach(card => {
                 const cardDiv = document.createElement("div");
                 cardDiv.classList.add("card");
-                cardDiv.style.backgroundImage = `url(${card.img})`;
+                cardDiv.style.backgroundImage = `url(images/cards/${card.img.split('/').pop()})`;
                 cardDiv.dataset.id = card.id;
                 tiedCardsDiv.appendChild(cardDiv);
             });
@@ -135,7 +135,7 @@ export function updateBoard(gameState, playerPlayCallback) {
         group.forEach(card => {
             const cardDiv = document.createElement("div");
             cardDiv.classList.add("card");
-            cardDiv.style.backgroundImage = `url(${card.img})`;
+            cardDiv.style.backgroundImage = `url(images/cards/${card.img.split('/').pop()})`;
             cardDiv.dataset.id = card.id;
             groupContainer.appendChild(cardDiv);
         });

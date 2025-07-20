@@ -286,6 +286,22 @@ h2, h3 {
     background-color: #45a049;
 }
 
+#showtime-spin-button {
+    margin-top: 20px;
+    padding: 15px 30px;
+    font-size: 24px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    transition: background-color 0.3s ease;
+}
+
+#showtime-spin-button:hover {
+    background-color: #0056b3;
+}
+
 /* 쇼타임 스타일 */
 .showtime-container {
     display: flex;
@@ -296,8 +312,8 @@ h2, h3 {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 750px; /* 고정 너비 */
-    height: 1000px; /* 고정 높이 */
+    width: 800px; /* 고정 너비 */
+    height: 1400px; /* 고정 높이 */
     padding: 30px;
     background-color: rgba(0, 0, 0, 0.9);
     color: white;
@@ -319,7 +335,14 @@ h2, h3 {
     margin-bottom: 20px;
 }
 
-#showtime-return-button {
+.showtime-buttons {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+#showtime-return-button,
+#showtime-respin-button {
     padding: 15px 30px;
     font-size: 1em;
     cursor: pointer;
@@ -330,7 +353,8 @@ h2, h3 {
     transition: background-color 0.3s ease;
 }
 
-#showtime-return-button:hover {
+#showtime-return-button:hover,
+#showtime-respin-button:hover {
     background-color: #0056b3;
 }
 

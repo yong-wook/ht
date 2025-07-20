@@ -77,8 +77,20 @@
             <img id="showtime-image" src="" alt="Showtime Character">
         </div>
         <p>상대방의 판돈이 모두 소진되었습니다!</p>
-        <button id="showtime-return-button">스테이지 선택으로 돌아가기</button>
+        <p id="showtime-respin-cost" style="font-size: 0.8em; margin-bottom: 10px;"></p>
+        <div class="showtime-buttons">
+            <button id="showtime-return-button">스테이지 선택으로 돌아가기</button>
+            <button id="showtime-respin-button">한번 더 룰렛 돌리기</button>
+        </div>
     </div>
+
+    <div id="showtime-roulette-container" class="roulette-container" style="display: none;">
+        <div class="roulette-wheel">
+            <canvas id="showtime-roulette-canvas" width="300" height="300"></canvas>
+        </div>
+        <button id="showtime-spin-button">쇼타임 룰렛 돌리기</button>
+    </div>
+
     <script type="module" src="js/main.js"></script>
 </body>
 </html>

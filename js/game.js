@@ -270,3 +270,11 @@ export function decrementExtraFlips() {
         extraFlipsRemaining--;
     }
 }
+
+export function deductPlayerMoney(amount) {
+    if (playerMoney >= amount) {
+        playerMoney -= amount;
+        return true;
+    }
+    return false;
+}

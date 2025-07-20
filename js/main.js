@@ -1,9 +1,10 @@
-import { CARDS } from './config.js';
+import { CARDS, SHOWTIME_RESPIN_COST } from './config.js';
 import * as Game from './game.js';
 import * as UI from './ui.js';
 import * as Stage from './stage.js';
 import * as Roulette from './roulette.js';
 import * as Showtime from './showtime.js';
+import * as ShowtimeRoulette from './showtime_roulette.js';
 
 const stageSelectionContainer = document.getElementById('stage-selection');
 const gameContainer = document.getElementById('game-container');
@@ -537,10 +538,42 @@ function handleGameEnd() {
     // 컴퓨터 판돈이 0 이하가 되면 쇼타임
     if (Game.computerMoney <= 0) {
         gameContainer.style.display = 'none';
-        Showtime.showShowtime(() => {
-            Showtime.hideShowtime();
-            stageSelectionContainer.style.display = 'block'; // 스테이지 선택 화면으로 돌아가기
-        }, Stage.getSelectedStage());
+        // 쇼타임 룰렛 아이템 준비
+        const stage = Stage.getSelectedStage();
+        const showtimeImages = [];
+        for (let i = 1; i <= 12; i++) {
+            showtimeImages.push({
+                name: `배경 ${i}`, // 룰렛에 표시될 이름
+                imagePath: `images/stages/stage${stage.id}/showtime_bg_stage${stage.id}_${String(i).padStart(2, '0')}.jpg`
+            });
+        }
+
+        // 쇼타임 룰렛을 다시 돌리는 콜백 함수 정의
+        const respinShowtime = (currentStage, currentShowtimeImages) => {
+            // 재화 확인 및 차감
+            if (!Game.deductPlayerMoney(SHOWTIME_RESPIN_COST)) {
+                alert(`재화가 부족합니다! 쇼타임 룰렛을 다시 돌릴 수 없습니다. (필요: ${SHOWTIME_RESPIN_COST.toLocaleString()}원)`);
+                return; // 재화 부족 시 룰렛 돌리지 않음
+            }
+            UI.updateMoneyDisplay(Game.playerMoney, Game.computerMoney); // UI 업데이트
+
+            Showtime.hideShowtime(); // 현재 쇼타임 화면 숨기기
+            ShowtimeRoulette.showShowtimeRoulette(currentShowtimeImages, (reselectedImage) => {
+                ShowtimeRoulette.hideShowtimeRoulette();
+                Showtime.showShowtime(() => {
+                    Showtime.hideShowtime();
+                    stageSelectionContainer.style.display = 'block';
+                }, currentStage, reselectedImage.imagePath, () => respinShowtime(currentStage, currentShowtimeImages)); // 재귀적으로 respinShowtime 전달
+            });
+        };
+
+        ShowtimeRoulette.showShowtimeRoulette(showtimeImages, (selectedImage) => {
+            ShowtimeRoulette.hideShowtimeRoulette();
+            Showtime.showShowtime(() => {
+                Showtime.hideShowtime();
+                stageSelectionContainer.style.display = 'block'; // 스테이지 선택 화면으로 돌아가기
+            }, stage, selectedImage.imagePath, () => respinShowtime(stage, showtimeImages)); // respinShowtime 함수를 래핑하여 전달
+        });
     } else if (Game.playerMoney <= 0) {
         // 플레이어 판돈이 0 이하가 되면 게임 오버 (쇼타임과 유사하게 처리)
         gameContainer.style.display = 'none';
