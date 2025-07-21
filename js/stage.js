@@ -1,5 +1,6 @@
 import { STAGES } from './config.js';
 import * as Game from './game.js';
+import * as UI from './ui.js';
 
 let selectedStage = null;
 
@@ -34,7 +35,7 @@ export function initStageSelection(onStageSelect) {
             stageElement.addEventListener('click', () => {
                 if (Game.playerMoney >= stage.cost) {
                     if (confirm(`${stage.name} 스테이지를 해제하시겠습니까?\n비용: ${stage.cost.toLocaleString()}원`)) {
-                        Game.playerMoney -= stage.cost;
+                        Game.setPlayerMoney(Game.playerMoney - stage.cost);
                         UI.updateTotalMoneyDisplay(Game.playerMoney); // 소지금 UI 업데이트
                         Game.unlockedStages.push(stage.id);
                         Game.saveGameData();

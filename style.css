@@ -1,9 +1,27 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden; /* 스크롤바 제거 */
+}
+
 body {
     font-family: sans-serif;
     background-color: #f0f0f0;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: flex-start; /* 상단 정렬 */
+}
+
+#player-total-money-container {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-weight: bold;
+    z-index: 100;
 }
 
 h1 {
@@ -416,4 +434,69 @@ h2, h3 {
         transform: scale(1) translateX(0%);
         object-position: center center;
     }
+}
+
+/* 오프닝 크롤 스타일 */
+#opening-crawl {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: black;
+    color: yellow;
+    font-family: 'Star Jedi', 'Arial', sans-serif; /* 스타워즈 폰트 또는 대체 폰트 */
+    overflow: hidden;
+    perspective: 400px; /* 3D 원근감 */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end; /* 텍스트가 아래에서 위로 올라오도록 */
+    z-index: 1000;
+}
+
+.crawl-text {
+    position: absolute;
+    bottom: 0;
+    width: 80%;
+    height: auto;
+    transform-origin: 50% 100%; /* 아래쪽을 기준으로 변형 */
+    transform: rotateX(20deg) translateZ(0); /* 텍스트 기울기 */
+    animation: crawl 60s linear forwards; /* 텍스트 스크롤 애니메이션 */
+}
+
+.crawl-text p {
+    font-size: 2em;
+    text-align: center;
+    margin-bottom: 1em;
+    line-height: 1.5;
+}
+
+@keyframes crawl {
+    0% {
+        top: 100%;
+        transform: rotateX(20deg) translateZ(0);
+    }
+    100% {
+        top: -200%; /* 텍스트가 화면 위로 완전히 사라지도록 */
+        transform: rotateX(20deg) translateZ(-2500px); /* 멀어지는 효과 */
+    }
+}
+
+#skip-button {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    font-size: 1.2em;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    z-index: 1001;
+}
+
+#skip-button:hover {
+    background-color: #45a049;
 }

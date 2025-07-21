@@ -7,9 +7,11 @@ import * as Showtime from './showtime.js';
 import * as ShowtimeRoulette from './showtime_roulette.js';
 
 const startScreen = document.getElementById('start-screen');
-const startGameButton = document.getElementById('start-game-button');
+const titleImage = document.getElementById('title-image'); // titleImage 참조 추가
 const stageSelectionContainer = document.getElementById('stage-selection');
 const gameContainer = document.getElementById('game-container');
+const openingCrawl = document.getElementById('opening-crawl');
+const skipButton = document.getElementById('skip-button');
 
 let currentRouletteReward = null; // 현재 룰렛 보상 효과
 let hasUsedExtraFlipThisTurn = false; // 현재 턴에 추가 뒤집기를 사용했는지 여부
@@ -686,10 +688,26 @@ UI.stopButton.addEventListener('click', handleStop);
 function initializeApp() {
     Game.loadGameData();
     UI.updateTotalMoneyDisplay(Game.playerMoney); // 소지금 표시
-    startGameButton.addEventListener('click', () => {
+    titleImage.addEventListener('click', () => { // startGameButton 대신 titleImage 클릭 이벤트
         startScreen.style.display = 'none';
-        stageSelectionContainer.style.display = 'block';
-        Stage.initStageSelection(startGame);
+        openingCrawl.style.display = 'flex'; // 오프닝 크롤 표시
+
+        const crawlText = openingCrawl.querySelector('.crawl-text');
+        // 애니메이션이 끝나면 스테이지 선택 화면으로 전환
+        crawlText.addEventListener('animationend', () => {
+            openingCrawl.style.display = 'none';
+            stageSelectionContainer.style.display = 'block';
+            Stage.initStageSelection(startGame);
+        });
+
+        // 스킵 버튼 이벤트 리스너
+        skipButton.addEventListener('click', () => {
+            // 애니메이션 즉시 종료 및 스테이지 선택 화면으로 전환
+            crawlText.style.animationPlayState = 'paused'; // 애니메이션 일시 정지
+            openingCrawl.style.display = 'none';
+            stageSelectionContainer.style.display = 'block';
+            Stage.initStageSelection(startGame);
+        });
     });
 }
 

@@ -229,6 +229,10 @@ export function setComputerScore(score) {
     computerScore = score;
 }
 
+export function setPlayerMoney(amount) {
+    playerMoney = amount;
+}
+
 // 상태 변수를 업데이트하는 함수들
 export function setPlayerHand(newHand) { playerHand = newHand; }
 export function setComputerHand(newHand) { computerHand = newHand; }
