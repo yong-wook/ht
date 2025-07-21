@@ -689,6 +689,17 @@ function initializeApp() {
     Game.loadGameData();
     UI.updateTotalMoneyDisplay(Game.playerMoney); // 소지금 표시
     titleImage.addEventListener('click', () => { // startGameButton 대신 titleImage 클릭 이벤트
+        // 전체 화면 요청
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+        } else if (document.documentElement.mozRequestFullScreen) { /* Firefox */
+            document.documentElement.mozRequestFullScreen();
+        } else if (document.documentElement.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+            document.documentElement.webkitRequestFullscreen();
+        } else if (document.documentElement.msRequestFullscreen) { /* IE/Edge */
+            document.documentElement.msRequestFullscreen();
+        }
+
         startScreen.style.display = 'none';
         openingCrawl.style.display = 'flex'; // 오프닝 크롤 표시
 
