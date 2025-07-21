@@ -57,6 +57,8 @@ export const STAGES = [
         image: "images/stages/stage1/showtime_bg_stage1_01.jpg",
         showtimeImage: "images/stages/stage1/showtime_bg_stage1_08.jpg",
         initialMoney: 10000,
+        cost: 0,
+        unlocked: true
     },
     {
         id: 2,
@@ -64,6 +66,8 @@ export const STAGES = [
         image: "images/stages/stage2/showtime_bg_stage2_01.jpg",
         showtimeImage: "images/stages/stage2/showtime_bg_stage2_08.jpg",
         initialMoney: 50000,
+        cost: 200000,
+        unlocked: false
     },
     {
         id: 3,
@@ -71,6 +75,8 @@ export const STAGES = [
         image: "images/stages/stage3/showtime_bg_stage3_01.jpg",
         showtimeImage: "images/stages/stage3/showtime_bg_stage3_08.jpg",
         initialMoney: 100000,
+        cost: 1000000,
+        unlocked: false
     }
 ];
 

@@ -278,3 +278,27 @@ export function deductPlayerMoney(amount) {
     }
     return false;
 }
+
+// --- 데이터 저장 및 불러오기 ---
+export let unlockedStages = [1]; // 기본적으로 스테이지 1은 해제됨
+
+export function saveGameData() {
+    const data = {
+        playerMoney: playerMoney,
+        unlockedStages: unlockedStages
+    };
+    localStorage.setItem('goStopSaveData', JSON.stringify(data));
+}
+
+export function loadGameData() {
+    const savedData = localStorage.getItem('goStopSaveData');
+    if (savedData) {
+        const data = JSON.parse(savedData);
+        playerMoney = data.playerMoney;
+        unlockedStages = data.unlockedStages;
+    } else {
+        // 기본값 설정
+        playerMoney = 100000;
+        unlockedStages = [1];
+    }
+}

@@ -13,6 +13,7 @@ export const playerMoneySpan = document.getElementById("player-money");
 export const computerMoneySpan = document.getElementById("computer-money");
 export const deckDiv = document.getElementById("deck");
 export const flippedCardContainerDiv = document.getElementById("flipped-card-container");
+export const totalMoneySpan = document.getElementById('player-total-money'); // 전체 소지금 표시
 
 // 카드 표시
 export function displayCards(cards, container, isPlayer, playerPlayCallback) {
@@ -157,10 +158,15 @@ export function updateBoard(gameState, playerPlayCallback) {
     updateMoneyDisplay(playerMoney, computerMoney);
 }
 
-// 판돈 표시 업데이트
+// 판돈 표시 업데이트 (게임 보드 내)
 export function updateMoneyDisplay(playerMoney, computerMoney) {
     playerMoneySpan.textContent = playerMoney.toLocaleString();
     computerMoneySpan.textContent = computerMoney.toLocaleString();
+}
+
+// 전체 소지금 표시 업데이트 (화면 상단)
+export function updateTotalMoneyDisplay(playerMoney) {
+    totalMoneySpan.textContent = playerMoney.toLocaleString();
 }
 
 // 상태 메시지 업데이트

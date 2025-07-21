@@ -7,8 +7,15 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>고스톱</h1>
-    <div id="stage-selection" class="stage-selection">
+    <div id="player-total-money-container">
+        <span>내 소지금: </span><span id="player-total-money">0</span>원
+    </div>
+    <div id="start-screen">
+        <h1>고스톱</h1>
+        <button id="start-game-button">게임 시작</button>
+    </div>
+
+    <div id="stage-selection" class="stage-selection" style="display: none;">
         <h2>스테이지 선택</h2>
         <div id="stage-container" class="stage-container">
             <!-- 스테이지 캐릭터들이 여기에 동적으로 추가됩니다. -->

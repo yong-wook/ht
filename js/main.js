@@ -6,6 +6,8 @@ import * as Roulette from './roulette.js';
 import * as Showtime from './showtime.js';
 import * as ShowtimeRoulette from './showtime_roulette.js';
 
+const startScreen = document.getElementById('start-screen');
+const startGameButton = document.getElementById('start-game-button');
 const stageSelectionContainer = document.getElementById('stage-selection');
 const gameContainer = document.getElementById('game-container');
 
@@ -145,6 +147,8 @@ function checkChongtong() {
                     winner = 'computer';
                 }
                 const moneyWon = Game.calculateMoney(winner, score);
+                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                Game.saveGameData(); // 데이터 저장
                 alert(`${playerName} 총통! ${month}월 패 4장으로 승리! (+${score}점, +${moneyWon.toLocaleString()}원)`);
                 updateFullBoard();
                 handleGameEnd(); // 총통 발생 시 게임 종료 처리
@@ -282,7 +286,16 @@ function playerPlay(selectedCard) {
         Game.fieldCards.push(selectedCard);
         const flippedCard = Game.deck.pop();
         UI.displayFlippedCard(flippedCard);
-        if (flippedCard) handleFlippedCard('player', flippedCard);
+        if (flippedCard) {
+            const isJjok = selectedCard.month === flippedCard.month;
+            handleFlippedCard('player', flippedCard);
+            if (isJjok) {
+                UI.updateStatusMessage("쪽!");
+                if (Game.takePiFromOpponent('player')) {
+                    UI.updateStatusMessage("쪽! 상대방의 피를 1장 가져옵니다.");
+                }
+            }
+        }
     }
 
     if (!isPlayerChoiceNeeded) {
@@ -381,26 +394,18 @@ function computerTurn() {
 
         if (cardToReleaseBbeok) {
             const bbeokGroupToRelease = Game.tiedCards.find(group => group[0].month === cardToReleaseBbeok.month);
-            const bbeokMonth = bbeokGroupToRelease[0].month; // 뻑 패의 월 저장
 
+            UI.updateStatusMessage(`${cardToReleaseBbeok.month}월 뻑 패를 가져갑니다!`);
             Game.acquireCards('computer', cardToReleaseBbeok, ...bbeokGroupToRelease);
+            if(Game.takePiFromOpponent('computer')) UI.updateStatusMessage(UI.statusMessage.textContent + " 상대 피 1장 가져옴!");
+
             Game.setTiedCards(Game.tiedCards.filter(group => group[0].month !== cardToReleaseBbeok.month));
             Game.setComputerHand(Game.computerHand.filter(c => c.id !== cardToReleaseBbeok.id));
-            UI.updateStatusMessage(`${cardToReleaseBbeok.month}월 뻑 패를 가져갑니다!`);
-            if(Game.takePiFromOpponent('computer')) UI.updateStatusMessage(UI.statusMessage.textContent + " 상대 피 1장 가져옴!");
 
             const flippedCard = Game.deck.pop();
             UI.displayFlippedCard(flippedCard);
-            
-            // 뒤집은 패가 뻑 패와 같은 월인지 확인하여 처리
-            if (flippedCard && flippedCard.month === bbeokMonth) {
-                UI.updateStatusMessage(`${bbeokMonth}월 또 뻑!`);
-                // 새로운 뻑 그룹 생성
-                const newBbeokGroup = [cardToReleaseBbeok, ...bbeokGroupToRelease, flippedCard];
-                Game.setTiedCards([...Game.tiedCards, newBbeokGroup]);
-
-            } else if (flippedCard) {
-                handleFlippedCard('computer', flippedCard); // 일반적인 뒤집은 패 처리
+            if (flippedCard) {
+                handleFlippedCard('computer', flippedCard);
             }
 
             if (Game.fieldCards.length === 0) isSsakSseuri = true;
@@ -442,7 +447,6 @@ function computerTurn() {
                 
                 UI.updateStatusMessage(`컴퓨터 ${cardInHand.month}월 따닥!`);
                 Game.acquireCards('computer', playedCard, chosenFieldCard);
-                Game.setFieldCards(Game.fieldCards.filter(c => c.id !== chosenFieldCard.id));
                 break; // 따닥을 찾았으면 더 이상 탐색하지 않음
             }
         }
@@ -470,9 +474,11 @@ function computerTurn() {
     }
 
     // 3. 없으면 그냥 내기 (기존 로직 유지)
+    let playedToField = false; // 쪽 확인을 위한 플래그
     if (!playedCard) {
         playedCard = Game.computerHand[Math.floor(Math.random() * Game.computerHand.length)];
         Game.fieldCards.push(playedCard);
+        playedToField = true;
     }
     
     if (playedCard) {
@@ -503,6 +509,12 @@ function computerTurn() {
             if(Game.takePiFromOpponent('computer')) UI.updateStatusMessage(UI.statusMessage.textContent + " 상대 피 1장 가져옴!");
         } else {
             handleFlippedCard('computer', flippedCard);
+            if (playedToField && playedCard.month === flippedCard.month) {
+                UI.updateStatusMessage("컴퓨터 쪽!");
+                if (Game.takePiFromOpponent('computer')) {
+                    UI.updateStatusMessage("컴퓨Tㅓ 쪽! 상대방의 피를 1장 가져옵니다.");
+                }
+            }
         }
     }
 
@@ -622,6 +634,8 @@ function handleStop() {
         finalPlayerScore *= Game.currentRoundWinMultiplier;
 
         moneyWon = Game.calculateMoney('player', finalPlayerScore);
+        UI.updateTotalMoneyDisplay(Game.playerMoney);
+        Game.saveGameData(); // 데이터 저장
         alert(`플레이어 승리! 최종 점수: ${finalPlayerScore}점, 획득 금액: ${moneyWon.toLocaleString()}원`);
 
         // 컴퓨터 판돈이 0이 아니고, 플레이어가 이겼을 때 룰렛 표시
@@ -642,11 +656,15 @@ function handleStop() {
         if (computerResult.breakdown.some(b => b.startsWith('광')) && Game.playerAcquired.filter(c => c.type === 'gwang').length === 0) finalComputerScore *= 2;
 
         moneyWon = Game.calculateMoney('computer', finalComputerScore);
+        UI.updateTotalMoneyDisplay(Game.playerMoney);
+        Game.saveGameData(); // 데이터 저장
         alert(`컴퓨터 승리! 최종 점수: ${finalComputerScore}점, 잃은 금액: ${moneyWon.toLocaleString()}원`);
         handleGameEnd();
 
     } else {
         alert("무승부!");
+        UI.updateTotalMoneyDisplay(Game.playerMoney);
+        Game.saveGameData(); // 데이터 저장
         handleGameEnd();
     }
 
@@ -665,7 +683,17 @@ UI.goButton.addEventListener('click', handleGo);
 UI.stopButton.addEventListener('click', handleStop);
 
 // --- 애플리케이션 시작 ---
-Stage.initStageSelection(startGame);
+function initializeApp() {
+    Game.loadGameData();
+    UI.updateTotalMoneyDisplay(Game.playerMoney); // 소지금 표시
+    startGameButton.addEventListener('click', () => {
+        startScreen.style.display = 'none';
+        stageSelectionContainer.style.display = 'block';
+        Stage.initStageSelection(startGame);
+    });
+}
+
+initializeApp();
 
 // 치트키: 숫자패드 + 키를 누르면 쇼타임 발동
 document.addEventListener('keydown', (event) => {
