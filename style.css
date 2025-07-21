@@ -500,3 +500,207 @@ h2, h3 {
 #skip-button:hover {
     background-color: #45a049;
 }
+
+/* 모바일 반응형 */
+@media screen and (max-width: 768px) {
+    body {
+        font-size: 14px;
+    }
+
+    .scoreboard {
+        width: 90%;
+    }
+
+    .game-board {
+        flex-direction: column; /* 세로로 정렬 */
+        width: 95%;
+        padding: 10px;
+    }
+
+    .hand-area {
+        min-width: unset;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    .center-area {
+        margin: 10px 0;
+        width: 100%;
+    }
+
+    .card {
+        width: 10vw; /* 화면 너비에 비례 */
+        height: calc(10vw * 1.6); /* 비율 유지 */
+        margin: 1vw;
+    }
+
+    .acquired-group-cards .card {
+        width: 8vw;
+        height: calc(8vw * 1.6);
+    }
+
+    #go-button, #stop-button {
+        padding: 8px 15px;
+        font-size: 14px;
+    }
+
+    /* 쇼타임 컨테이너 */
+    .showtime-container {
+        width: 95vw;
+        height: 95vh;
+        font-size: 1.5em;
+        padding: 15px;
+    }
+
+    .showtime-container h2 {
+        font-size: 1.2em;
+    }
+
+    .showtime-container p {
+        font-size: 0.6em;
+    }
+
+    .showtime-buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    #showtime-return-button,
+    #showtime-respin-button {
+        padding: 10px 20px;
+        font-size: 0.9em;
+    }
+
+    /* 오프닝 크롤 */
+    .crawl-text p {
+        font-size: 1.5em;
+    }
+
+    #skip-button {
+        padding: 8px 15px;
+        font-size: 1em;
+    }
+}
+
+/* 가로 모드 (화투 게임) */
+@media screen and (orientation: landscape) and (max-height: 768px) {
+    body {
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .game-board {
+        flex-direction: row;
+        width: 98vw;
+        height: 95vh;
+        padding: 1vw;
+    }
+
+    .hand-area {
+        width: 25vw;
+        height: 90vh;
+        justify-content: space-around;
+    }
+
+    .center-area {
+        width: 40vw;
+        height: 90vh;
+        margin: 0 1vw;
+    }
+
+    .card {
+        width: 6vw;
+        height: calc(6vw * 1.6);
+        margin: 0.5vw;
+    }
+
+    .acquired-group-cards .card {
+        width: 4vw;
+        height: calc(4vw * 1.6);
+    }
+
+    .scoreboard {
+        position: absolute;
+        top: 1vh;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 50vw;
+        font-size: 0.8em;
+        padding: 0.5vw;
+    }
+
+    #player-total-money-container {
+        top: 1vh;
+        left: 1vw;
+        font-size: 0.8em;
+    }
+
+    .status-message {
+        font-size: 1em;
+    }
+
+    #go-button, #stop-button {
+        padding: 0.5em 1em;
+        font-size: 0.9em;
+    }
+
+    .roulette-container, .showtime-roulette-container {
+        width: 100vw;
+        height: 100vh;
+    }
+
+    .showtime-container {
+        width: 90vw;
+        height: 90vh;
+        font-size: 1.5em;
+    }
+
+    .crawl-text p {
+        font-size: 1.8em;
+    }
+}
+
+/* 세로 모드 (쇼타임) */
+@media screen and (orientation: portrait) and (max-width: 768px) {
+    .showtime-container {
+        width: 95vw;
+        height: 95vh;
+        font-size: 1.5em;
+        padding: 15px;
+    }
+
+    .showtime-container h2 {
+        font-size: 1.2em;
+    }
+
+    .showtime-container p {
+        font-size: 0.6em;
+    }
+
+    .showtime-buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    #showtime-return-button,
+    #showtime-respin-button {
+        padding: 10px 20px;
+        font-size: 0.9em;
+    }
+
+    /* 오프닝 크롤 */
+    .crawl-text p {
+        font-size: 1.5em;
+    }
+
+    #skip-button {
+        padding: 8px 15px;
+        font-size: 1em;
+    }
+
+    /* 게임 보드 숨김 */
+    .game-container {
+        display: none; /* 세로 모드에서는 게임 보드 숨김 */
+    }
+}
