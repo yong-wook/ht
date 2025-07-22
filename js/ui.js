@@ -179,3 +179,67 @@ export function showGoStopButtons(show) {
     goButton.style.display = show ? 'inline-block' : 'none';
     stopButton.style.display = show ? 'inline-block' : 'none';
 }
+
+export function showResultModal(winner, finalScore, moneyWon, breakdown) {
+    const modal = document.createElement('div');
+    modal.id = 'result-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 20px;
+        border: 1px solid black;
+        z-index: 1000;
+        text-align: center;
+    `;
+
+    let titleHtml;
+    if (winner === 'player') {
+        titleHtml = '<h2 style="color: black;">승리!</h2>';
+    } else if (winner === 'computer') {
+        titleHtml = '<h2>패배!</h2>';
+    } else {
+        titleHtml = '<h2>무승부</h2>';
+    }
+
+    const breakdownHtml = breakdown.join('<br>');
+
+    modal.innerHTML = `
+        ${titleHtml}
+        <p>최종 점수: ${finalScore}점</p>
+        <p>${winner === 'player' ? '획득' : (winner === 'computer' ? '잃은' : '변동')} 금액: ${moneyWon.toLocaleString()}원</p>
+        <hr>
+        <p><b>점수 계산 내역</b></p>
+        <div style="text-align: left; display: inline-block;">${breakdownHtml}</div>
+        <br><br>
+        <button id="close-result-modal">확인</button>
+    `;
+
+    document.body.appendChild(modal);
+
+    document.getElementById('close-result-modal').addEventListener('click', () => {
+        modal.remove();
+    });
+}
+
+export function promptCardSelection(cardsToSelect, callback) {
+    updateStatusMessage("가져올 카드를 선택하세요.");
+
+    cardsToSelect.forEach(card => {
+        const cardDiv = fieldDiv.querySelector(`[data-id='${card.id}']`);
+        if (cardDiv) {
+            cardDiv.classList.add('selectable');
+            cardDiv.onclick = () => {
+                // 모든 선택 가능한 카드에서 'selectable' 클래스와 클릭 이벤트 제거
+                fieldDiv.querySelectorAll('.selectable').forEach(div => {
+                    div.classList.remove('selectable');
+                    div.onclick = null;
+                });
+                // 콜백 함수 실행
+                callback(card);
+            };
+        }
+    });
+}

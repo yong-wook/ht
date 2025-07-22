@@ -228,6 +228,7 @@ function playerPlay(selectedCard) {
     Game.setPlayerHand(Game.playerHand.filter((c) => c.id !== selectedCard.id));
 
     let isPlayerChoiceNeeded = false;
+    let choiceNeededAfterFlip = false;
     if (matchingCardsInField.length === 1) {
         const flippedCard = Game.deck.pop();
         UI.displayFlippedCard(flippedCard);
@@ -237,43 +238,32 @@ function playerPlay(selectedCard) {
             Game.setFieldCards(Game.fieldCards.filter(c => c.id !== matchingCardsInField[0].id));
         } else {
             Game.acquireCards('player', selectedCard, matchingCardsInField[0]);
-            if (flippedCard) handleFlippedCard('player', flippedCard);
+            if (flippedCard) {
+                choiceNeededAfterFlip = handleFlippedCard('player', flippedCard);
+            }
         }
     } else if (matchingCardsInField.length === 2) { // 따닥 선택
         isPlayerChoiceNeeded = true;
-        UI.updateStatusMessage(`${selectedCard.month}월 패와 바닥의 패 중 하나를 선택하세요.`);
-        matchingCardsInField.forEach(card => {
-            const cardDiv = UI.fieldDiv.querySelector(`[data-id='${card.id}']`);
-            if (cardDiv) {
-                cardDiv.classList.add('selectable');
-                cardDiv.onclick = () => {
-                    const chosenFieldCard = card;
-                    const remainingFieldCard = matchingCardsInField.find(c => c.id !== chosenFieldCard.id);
+        UI.promptCardSelection(matchingCardsInField, (chosenFieldCard) => {
+            const remainingFieldCard = matchingCardsInField.find(c => c.id !== chosenFieldCard.id);
 
-                    Game.acquireCards('player', selectedCard, chosenFieldCard);
-                    Game.setFieldCards(Game.fieldCards.filter(c => c.id !== chosenFieldCard.id));
+            Game.acquireCards('player', selectedCard, chosenFieldCard);
+            Game.setFieldCards(Game.fieldCards.filter(c => c.id !== chosenFieldCard.id));
 
-                    UI.fieldDiv.querySelectorAll('.selectable').forEach(div => {
-                        div.classList.remove('selectable');
-                        div.onclick = null; // 이벤트 리스너 제거
-                    });
+            const flippedCard = Game.deck.pop();
+            UI.displayFlippedCard(flippedCard);
 
-                    const flippedCard = Game.deck.pop();
-                    UI.displayFlippedCard(flippedCard);
-
-                    if (flippedCard) {
-                        if (remainingFieldCard && flippedCard.month === remainingFieldCard.month) {
-                            UI.updateStatusMessage(`${selectedCard.month}월 따닥! (뒤집은 패 포함)`);
-                            Game.acquireCards('player', remainingFieldCard, flippedCard);
-                            Game.setFieldCards(Game.fieldCards.filter(c => c.id !== remainingFieldCard.id));
-                            if(Game.takePiFromOpponent('player')) UI.updateStatusMessage(UI.statusMessage.textContent + " 상대 피 1장 가져옴!");
-                        } else {
-                            handleFlippedCard('player', flippedCard);
-                        }
-                    }
-                    endPlayerTurn(Game.fieldCards.length === 0);
-                };
+            if (flippedCard) {
+                if (remainingFieldCard && flippedCard.month === remainingFieldCard.month) {
+                    UI.updateStatusMessage(`${selectedCard.month}월 따닥! (뒤집은 패 포함)`);
+                    Game.acquireCards('player', remainingFieldCard, flippedCard);
+                    Game.setFieldCards(Game.fieldCards.filter(c => c.id !== remainingFieldCard.id));
+                    if(Game.takePiFromOpponent('player')) UI.updateStatusMessage(UI.statusMessage.textContent + " 상대 피 1장 가져옴!");
+                } else {
+                    handleFlippedCard('player', flippedCard);
+                }
             }
+            endPlayerTurn(Game.fieldCards.length === 0);
         });
     } else if (matchingCardsInField.length === 3) { // 바닥에 3장 깔린 경우
         UI.updateStatusMessage(`${selectedCard.month}월 4장 한번에 획득!`);
@@ -282,7 +272,7 @@ function playerPlay(selectedCard) {
         const flippedCard = Game.deck.pop();
         UI.displayFlippedCard(flippedCard);
         if (flippedCard) {
-            handleFlippedCard('player', flippedCard);
+            choiceNeededAfterFlip = handleFlippedCard('player', flippedCard);
         }
     } else { // 낼 패가 없을 때
         Game.fieldCards.push(selectedCard);
@@ -290,7 +280,7 @@ function playerPlay(selectedCard) {
         UI.displayFlippedCard(flippedCard);
         if (flippedCard) {
             const isJjok = selectedCard.month === flippedCard.month;
-            handleFlippedCard('player', flippedCard);
+            choiceNeededAfterFlip = handleFlippedCard('player', flippedCard);
             if (isJjok) {
                 UI.updateStatusMessage("쪽!");
                 if (Game.takePiFromOpponent('player')) {
@@ -300,19 +290,45 @@ function playerPlay(selectedCard) {
         }
     }
 
-    if (!isPlayerChoiceNeeded) {
+    if (!isPlayerChoiceNeeded && !choiceNeededAfterFlip) {
         endPlayerTurn(Game.fieldCards.length === 0);
     }
 }
 
 // 뒤집은 카드 처리
 function handleFlippedCard(turn, flippedCard) {
+    const bbeokGroupToTake = Game.tiedCards.find(group => group[0].month === flippedCard.month);
+
+    if (bbeokGroupToTake) {
+        UI.updateStatusMessage(`${flippedCard.month}월 뻑 패를 가져갑니다!`);
+        Game.acquireCards(turn, flippedCard, ...bbeokGroupToTake);
+        Game.setTiedCards(Game.tiedCards.filter(group => group[0].month !== flippedCard.month));
+        if (Game.takePiFromOpponent(turn)) {
+            UI.updateStatusMessage(UI.statusMessage.textContent + " 상대 피 1장 가져옴!");
+        }
+        return false; // 뻑 처리 후 함수 종료, 선택 필요 없음
+    }
+
     const matchingField = Game.fieldCards.filter(c => c.month === flippedCard.month);
     if (matchingField.length > 0) {
-        Game.acquireCards(turn, flippedCard, ...matchingField);
+        if (matchingField.length > 1) {
+            if (turn === 'player') {
+                UI.promptCardSelection(matchingField, (chosenCard) => {
+                    Game.acquireCards(turn, flippedCard, chosenCard);
+                    endPlayerTurn(Game.fieldCards.length === 0);
+                });
+                return true; // 플레이어 선택이 필요함을 알림
+            } else { // 컴퓨터 턴
+                matchingField.sort((a, b) => getCardValue(b) - getCardValue(a));
+                Game.acquireCards(turn, flippedCard, matchingField[0]);
+            }
+        } else { // 매칭되는 카드가 하나일 때
+            Game.acquireCards(turn, flippedCard, ...matchingField);
+        }
     } else {
         Game.fieldCards.push(flippedCard);
     }
+    return false; // 그 외의 경우는 선택 필요 없음
 }
 
 // 플레이어 턴 종료
@@ -615,30 +631,59 @@ function handleStop() {
     let finalPlayerScore = playerResult.score;
     let finalComputerScore = computerResult.score;
     let moneyWon = 0;
+    let winner = '';
+    let breakdown = [];
 
     if (finalPlayerScore > finalComputerScore) {
+        winner = 'player';
+        breakdown = playerResult.breakdown;
+
         // 고 점수
         if (Game.playerGoCount > 0) {
-            if (Game.playerGoCount === 1) finalPlayerScore += 1;
-            else if (Game.playerGoCount === 2) finalPlayerScore += 2;
-            else finalPlayerScore *= Math.pow(2, Game.playerGoCount - 2);
+            if (Game.playerGoCount === 1) {
+                finalPlayerScore += 1;
+                breakdown.push(`1고 (+1점)`);
+            } else if (Game.playerGoCount === 2) {
+                finalPlayerScore += 2;
+                breakdown.push(`2고 (+2점)`);
+            } else {
+                const goMultiplier = Math.pow(2, Game.playerGoCount - 2);
+                finalPlayerScore *= goMultiplier;
+                breakdown.push(`${Game.playerGoCount}고 (x${goMultiplier})`);
+            }
         }
         // 피박, 광박, 고박
         const computerPiCount = Game.computerAcquired.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : (cur.type === 'pi' ? 1 : 0)), 0);
-        if (playerResult.breakdown.some(b => b.startsWith('피')) && computerPiCount < 5) finalPlayerScore *= 2;
-        if (playerResult.breakdown.some(b => b.startsWith('광')) && Game.computerAcquired.filter(c => c.type === 'gwang').length === 0) finalPlayerScore *= 2;
-        if (Game.playerGoCount > 0 && finalComputerScore === 0) finalPlayerScore *= 2;
+        if (playerResult.breakdown.some(b => b.startsWith('피')) && computerPiCount < 5) {
+            finalPlayerScore *= 2;
+            breakdown.push(`피박 (x2)`);
+        }
+        if (playerResult.breakdown.some(b => b.startsWith('광')) && Game.computerAcquired.filter(c => c.type === 'gwang').length === 0) {
+            finalPlayerScore *= 2;
+            breakdown.push(`광박 (x2)`);
+        }
+        if (Game.playerGoCount > 0 && finalComputerScore === 0) {
+            finalPlayerScore *= 2;
+            breakdown.push(`고박 (x2)`);
+        }
         // 흔들기/폭탄
-        const multiplier = Math.pow(2, Game.playerShakeCount + Game.playerBombCount);
-        finalPlayerScore *= multiplier;
+        const shakeAndBombMultiplier = Math.pow(2, Game.playerShakeCount + Game.playerBombCount);
+        if (shakeAndBombMultiplier > 1) {
+            finalPlayerScore *= shakeAndBombMultiplier;
+            if (Game.playerShakeCount > 0) breakdown.push(`흔들기 (x${Math.pow(2, Game.playerShakeCount)})`);
+            if (Game.playerBombCount > 0) breakdown.push(`폭탄 (x${Math.pow(2, Game.playerBombCount)})`);
+        }
 
         // 룰렛 보너스: 승리 시 점수 배율 적용
-        finalPlayerScore *= Game.currentRoundWinMultiplier;
+        if (Game.currentRoundWinMultiplier > 1) {
+            finalPlayerScore *= Game.currentRoundWinMultiplier;
+            breakdown.push(`승리 보너스 (x${Game.currentRoundWinMultiplier})`);
+        }
 
         moneyWon = Game.calculateMoney('player', finalPlayerScore);
         UI.updateTotalMoneyDisplay(Game.playerMoney);
         Game.saveGameData(); // 데이터 저장
-        alert(`플레이어 승리! 최종 점수: ${finalPlayerScore}점, 획득 금액: ${moneyWon.toLocaleString()}원`);
+        UI.showResultModal('player', finalPlayerScore, moneyWon, breakdown);
 
         // 컴퓨터 판돈이 0이 아니고, 플레이어가 이겼을 때 룰렛 표시
         if (Game.computerMoney > 0) {
@@ -652,19 +697,27 @@ function handleStop() {
         }
 
     } else if (finalComputerScore > finalPlayerScore) {
+        winner = 'computer';
+        breakdown = computerResult.breakdown;
         // 피박, 광박
         const playerPiCount = Game.playerAcquired.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : (cur.type === 'pi' ? 1 : 0)), 0);
-        if (computerResult.breakdown.some(b => b.startsWith('피')) && playerPiCount < 5) finalComputerScore *= 2;
-        if (computerResult.breakdown.some(b => b.startsWith('광')) && Game.playerAcquired.filter(c => c.type === 'gwang').length === 0) finalComputerScore *= 2;
+        if (computerResult.breakdown.some(b => b.startsWith('피')) && playerPiCount < 5) {
+            finalComputerScore *= 2;
+            breakdown.push(`피박 (x2)`);
+        }
+        if (computerResult.breakdown.some(b => b.startsWith('광')) && Game.playerAcquired.filter(c => c.type === 'gwang').length === 0) {
+            finalComputerScore *= 2;
+            breakdown.push(`광박 (x2)`);
+        }
 
         moneyWon = Game.calculateMoney('computer', finalComputerScore);
         UI.updateTotalMoneyDisplay(Game.playerMoney);
         Game.saveGameData(); // 데이터 저장
-        alert(`컴퓨터 승리! 최종 점수: ${finalComputerScore}점, 잃은 금액: ${moneyWon.toLocaleString()}원`);
+        UI.showResultModal('computer', finalComputerScore, moneyWon, breakdown);
         handleGameEnd();
 
     } else {
-        alert("무승부!");
+        UI.showResultModal('draw', 0, 0, ['무승부!']);
         UI.updateTotalMoneyDisplay(Game.playerMoney);
         Game.saveGameData(); // 데이터 저장
         handleGameEnd();
