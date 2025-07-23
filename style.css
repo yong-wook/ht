@@ -16,7 +16,7 @@ body {
 #player-total-money-container {
     position: fixed;
     top: 10px;
-    left: 10px;
+    right: 10px; /* 왼쪽에서 오른쪽으로 변경 */
     background-color: rgba(255, 255, 255, 0.8);
     padding: 5px 10px;
     border-radius: 5px;
@@ -526,20 +526,31 @@ h2, h3 {
         margin-bottom: 10px;
     }
 
+    /* 컴퓨터 손패 영역 숨기기 */
+    #computer-hand {
+        display: none;
+    }
+
     .center-area {
         margin: 10px 0;
         width: 100%;
     }
 
     .card {
-        width: 10vw; /* 화면 너비에 비례 */
-        height: calc(10vw * 1.6); /* 비율 유지 */
+        width: 15vw; /* 카드 크기 조정 */
+        height: calc(15vw * 1.6); /* 비율 유지 */
         margin: 1vw;
     }
 
+    /* 획득한 패 영역 축소 */
+    .acquired-cards {
+        max-height: 120px; /* 최대 높이 제한 */
+        overflow-y: auto; /* 내용 많으면 스크롤 */
+    }
+
     .acquired-group-cards .card {
-        width: 8vw;
-        height: calc(8vw * 1.6);
+        width: 10vw; /* 획득한 패 크기 더 작게 */
+        height: calc(10vw * 1.6);
     }
 
     #go-button, #stop-button {
@@ -584,9 +595,13 @@ h2, h3 {
         font-size: 1em;
     }
 
-    /* 게임 보드 숨김 */
+    /* 게임 컨테이너를 다시 보이게 설정 */
     .game-container {
-        display: none; /* 세로 모드에서는 게임 보드 숨김 */
+        display: flex; 
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        height: 100%;
     }
 }
 
@@ -711,4 +726,76 @@ h2, h3 {
     .game-container {
         display: none; /* 세로 모드에서는 게임 보드 숨김 */
     }
+}
+/* 배경 컬렉션 갤러리 모달 스타일 */
+.modal {
+    position: fixed; /* 화면에 고정 */
+    z-index: 2000; /* 최상단에 표시 */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto; /* 내용이 많으면 스크롤 */
+    background-color: rgba(0,0,0,0.6); /* 반투명 검은 배경 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 800px;
+    border-radius: 10px;
+    position: relative;
+}
+
+.close-button {
+    color: #aaa;
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.gallery-item {
+    width: 100%;
+    aspect-ratio: 9 / 16; /* 세로 이미지 비율 */
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #e0e0e0;
+}
+
+.gallery-item.locked {
+    background-color: #333;
+    color: #fff;
+    font-size: 3em;
+}
+
+.gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }

@@ -1,3 +1,5 @@
+import * as Game from './game.js';
+
 // DOM 요소
 export const playerHandDiv = document.querySelector("#player-hand .card-container");
 export const computerHandDiv = document.querySelector("#computer-hand .card-container");
@@ -242,4 +244,47 @@ export function promptCardSelection(cardsToSelect, callback) {
             };
         }
     });
+}
+
+// 배경 컬렉션 갤러리 표시
+export function showBackgroundGallery(stageId, stageName) {
+    const modal = document.getElementById('gallery-modal');
+    const title = document.getElementById('gallery-title');
+    const grid = document.getElementById('gallery-grid');
+    const closeButton = modal.querySelector('.close-button');
+
+    title.textContent = `${stageName} 배경 컬렉션`;
+    grid.innerHTML = ''; // 그리드 초기화
+
+    const unlockedBgs = Game.unlockedBackgrounds[stageId] || [];
+
+    for (let i = 1; i <= 12; i++) {
+        const item = document.createElement('div');
+        item.classList.add('gallery-item');
+
+        if (unlockedBgs.includes(i)) {
+            const img = document.createElement('img');
+            img.src = `images/stages/stage${stageId}/showtime_bg_stage${stageId}_${String(i).padStart(2, '0')}.jpg`;
+            img.alt = `배경 ${i}`;
+            item.appendChild(img);
+        } else {
+            item.classList.add('locked');
+            item.innerHTML = '?';
+        }
+        grid.appendChild(item);
+    }
+
+    modal.style.display = 'flex';
+
+    // 닫기 버튼 이벤트
+    closeButton.onclick = () => {
+        modal.style.display = 'none';
+    }
+
+    // 모달 외부 클릭 시 닫기
+    window.onclick = (event) => {
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
 }

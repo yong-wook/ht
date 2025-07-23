@@ -311,7 +311,11 @@ function handleFlippedCard(turn, flippedCard) {
 
     const matchingField = Game.fieldCards.filter(c => c.month === flippedCard.month);
     if (matchingField.length > 0) {
-        if (matchingField.length > 1) {
+        // 뒤집은 패로 바닥의 3장을 먹는 경우
+        if (matchingField.length === 3) {
+            UI.updateStatusMessage(`${flippedCard.month}월 4장 한번에 획득!`);
+            Game.acquireCards(turn, flippedCard, ...matchingField);
+        } else if (matchingField.length === 2) { // 뒤집은 패로 바닥의 2장 중 하나를 선택해야 하는 경우
             if (turn === 'player') {
                 UI.promptCardSelection(matchingField, (chosenCard) => {
                     Game.acquireCards(turn, flippedCard, chosenCard);
@@ -574,43 +578,54 @@ function handleGameEnd() {
         for (let i = 1; i <= 12; i++) {
             showtimeImages.push({
                 name: `배경 ${i}`, // 룰렛에 표시될 이름
+                id: i, // 배경 식별자
                 imagePath: `images/stages/stage${stage.id}/showtime_bg_stage${stage.id}_${String(i).padStart(2, '0')}.jpg`
             });
         }
 
-        // 쇼타임 룰렛을 다시 돌리는 콜백 함수 정의
-        const respinShowtime = (currentStage, currentShowtimeImages) => {
-            // 재화 확인 및 차감
-            if (!Game.deductPlayerMoney(SHOWTIME_RESPIN_COST)) {
-                alert(`재화가 부족합니다! 쇼타임 룰렛을 다시 돌릴 수 없습니다. (필요: ${SHOWTIME_RESPIN_COST.toLocaleString()}원)`);
-                return; // 재화 부족 시 룰렛 돌리지 않음
-            }
-            UI.updateMoneyDisplay(Game.playerMoney, Game.computerMoney); // UI 업데이트
-
-            Showtime.hideShowtime(); // 현재 쇼타임 화면 숨기기
-            ShowtimeRoulette.showShowtimeRoulette(currentShowtimeImages, (reselectedImage) => {
-                ShowtimeRoulette.hideShowtimeRoulette();
-                Showtime.showShowtime(() => {
-                    Showtime.hideShowtime();
-                    stageSelectionContainer.style.display = 'block';
-                }, currentStage, reselectedImage.imagePath, () => respinShowtime(currentStage, currentShowtimeImages)); // 재귀적으로 respinShowtime 전달
-            });
-        };
-
-        ShowtimeRoulette.showShowtimeRoulette(showtimeImages, (selectedImage) => {
+        // 해금 로직을 포함한 콜백
+        const onShowtimeRouletteComplete = (selectedImage) => {
             ShowtimeRoulette.hideShowtimeRoulette();
+
+            // 1. 배경 해금 정보 저장
+            const stageId = stage.id.toString();
+            const bgId = selectedImage.id;
+            if (!Game.unlockedBackgrounds[stageId]) {
+                Game.unlockedBackgrounds[stageId] = [];
+            }
+            if (!Game.unlockedBackgrounds[stageId].includes(bgId)) {
+                Game.unlockedBackgrounds[stageId].push(bgId);
+                Game.saveGameData(); // 변경된 데이터 저장
+                console.log(`스테이지 ${stageId}의 배경 ${bgId} 해금!`, Game.unlockedBackgrounds);
+            }
+
+            // 2. 쇼타임 화면 표시
             Showtime.showShowtime(() => {
                 Showtime.hideShowtime();
-                stageSelectionContainer.style.display = 'block'; // 스테이지 선택 화면으로 돌아가기
-            }, stage, selectedImage.imagePath, () => respinShowtime(stage, showtimeImages)); // respinShowtime 함수를 래핑하여 전달
-        });
-    } else if (Game.playerMoney <= 0) {
-        // 플레이어 판돈이 0 이하가 되면 게임 오버 (쇼타임과 유사하게 처리)
-        gameContainer.style.display = 'none';
-        Showtime.showShowtime(() => {
+                stageSelectionContainer.style.display = 'block';
+            }, stage, selectedImage.imagePath, () => respinShowtime(stage, showtimeImages));
+        };
+        
+        // 쇼타임 룰렛을 다시 돌리는 콜백 함수 정의
+        const respinShowtime = (currentStage, currentShowtimeImages) => {
+            if (!Game.deductPlayerMoney(SHOWTIME_RESPIN_COST)) {
+                alert(`재화가 부족합니다! (필요: ${SHOWTIME_RESPIN_COST.toLocaleString()}원)`);
+                return;
+            }
+            UI.updateMoneyDisplay(Game.playerMoney, Game.computerMoney);
             Showtime.hideShowtime();
-            stageSelectionContainer.style.display = 'block'; // 스테이지 선택 화면으로 돌아가기
-        }, Stage.getSelectedStage());
+            ShowtimeRoulette.showShowtimeRoulette(currentShowtimeImages, onShowtimeRouletteComplete);
+        };
+
+        ShowtimeRoulette.showShowtimeRoulette(showtimeImages, onShowtimeRouletteComplete);
+
+    } else if (Game.playerMoney <= 0) {
+        // 플레이어 파산 처리
+        gameContainer.style.display = 'none';
+        alert("파산했습니다... 게임 오버!");
+        // 여기에 게임 오버 관련 특별 화면이나 로직 추가 가능
+        startScreen.style.display = 'block'; // 예시: 시작 화면으로 돌아가기
+        location.reload(); // 간단하게 새로고침으로 초기화
     } else {
         // 판돈이 남아있으면 다음 라운드 시작
         initGame();

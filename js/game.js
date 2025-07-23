@@ -285,11 +285,13 @@ export function deductPlayerMoney(amount) {
 
 // --- 데이터 저장 및 불러오기 ---
 export let unlockedStages = [1]; // 기본적으로 스테이지 1은 해제됨
+export let unlockedBackgrounds = {}; // 예: { '1': [3, 8], '2': [1] }
 
 export function saveGameData() {
     const data = {
         playerMoney: playerMoney,
-        unlockedStages: unlockedStages
+        unlockedStages: unlockedStages,
+        unlockedBackgrounds: unlockedBackgrounds // 배경 정보 추가
     };
     localStorage.setItem('goStopSaveData', JSON.stringify(data));
 }
@@ -300,9 +302,11 @@ export function loadGameData() {
         const data = JSON.parse(savedData);
         playerMoney = data.playerMoney;
         unlockedStages = data.unlockedStages;
+        unlockedBackgrounds = data.unlockedBackgrounds || {}; // 이전 버전 저장 데이터 호환
     } else {
         // 기본값 설정
         playerMoney = 100000;
         unlockedStages = [1];
+        unlockedBackgrounds = {};
     }
 }
