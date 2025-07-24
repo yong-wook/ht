@@ -77,6 +77,15 @@ export const STAGES = [
         initialMoney: 100000,
         cost: 1000000,
         unlocked: false
+    },
+    {
+        id: 4,
+        name: "신의 경지",
+        image: "images/stages/stage4/showtime_bg_stage4_01.jpg",
+        showtimeImage: "images/stages/stage4/showtime_bg_stage4_08.jpg",
+        initialMoney: 200000,
+        cost: 2000000,
+        unlocked: false
     }
 ];
 

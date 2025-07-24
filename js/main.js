@@ -4,7 +4,7 @@ import * as UI from './ui.js';
 import * as Stage from './stage.js';
 import * as Roulette from './roulette.js';
 import * as Showtime from './showtime.js';
-import * as ShowtimeRoulette from './showtime_roulette.js';
+import * as ShowtimeCardSelect from './showtime_card_select.js';
 
 const startScreen = document.getElementById('start-screen');
 const titleImage = document.getElementById('title-image'); // titleImage 참조 추가
@@ -514,12 +514,17 @@ function computerTurn() {
         const matchingFieldForFlipped = Game.fieldCards.filter(c => c.month === flippedCard.month);
         const bbeokGroupToTake = Game.tiedCards.find(group => group[0].month === flippedCard.month);
 
-        // 컴퓨터가 낸 패와 뒤집은 패가 같은 월이라서 뻑이 나는 경우
-        if (playedCard && matchingFieldForFlipped.length === 1 && playedCard.month === flippedCard.month) {
-            UI.updateStatusMessage(`${playedCard.month}월 뻑! 패가 묶였습니다.`);
-            Game.setTiedCards([...Game.tiedCards, [playedCard, matchingFieldForFlipped[0], flippedCard]]);
-            Game.setFieldCards(Game.fieldCards.filter(c => c.id !== matchingFieldForFlipped[0].id));
-        } else if (bbeokGroupToTake) { // 기존에 있던 뻑을 먹는 경우
+        // 컴퓨터가 낸 패와 뒤집은 패가 같은 월이라서 '쪽'이 되는 경우 (가장 먼저 확인)
+        if (playedToField && playedCard.month === flippedCard.month) {
+            UI.updateStatusMessage("컴퓨터 쪽!");
+            Game.acquireCards('computer', playedCard, flippedCard); // 낸 패와 뒤집은 패 모두 획득
+            Game.setFieldCards(Game.fieldCards.filter(c => c.id !== playedCard.id)); // 바닥에서 제거
+            if (Game.takePiFromOpponent('computer')) {
+                UI.updateStatusMessage("컴퓨터 쪽! 상대방의 피를 1장 가져옵니다.");
+            }
+        } 
+        // 기존에 있던 뻑을 먹는 경우
+        else if (bbeokGroupToTake) {
             Game.acquireCards('computer', flippedCard, ...bbeokGroupToTake);
             Game.setTiedCards(Game.tiedCards.filter(group => group[0].month !== flippedCard.month));
             UI.updateStatusMessage(`${flippedCard.month}월 뻑 패를 가져갑니다!`);
@@ -584,9 +589,7 @@ function handleGameEnd() {
         }
 
         // 해금 로직을 포함한 콜백
-        const onShowtimeRouletteComplete = (selectedImage) => {
-            ShowtimeRoulette.hideShowtimeRoulette();
-
+        const onShowtimeCardSelectComplete = (selectedImage) => {
             // 1. 배경 해금 정보 저장
             const stageId = stage.id.toString();
             const bgId = selectedImage.id;
@@ -614,10 +617,10 @@ function handleGameEnd() {
             }
             UI.updateMoneyDisplay(Game.playerMoney, Game.computerMoney);
             Showtime.hideShowtime();
-            ShowtimeRoulette.showShowtimeRoulette(currentShowtimeImages, onShowtimeRouletteComplete);
+            ShowtimeCardSelect.showCardSelection(currentShowtimeImages, onShowtimeCardSelectComplete);
         };
 
-        ShowtimeRoulette.showShowtimeRoulette(showtimeImages, onShowtimeRouletteComplete);
+        ShowtimeCardSelect.showCardSelection(showtimeImages, onShowtimeCardSelectComplete);
 
     } else if (Game.playerMoney <= 0) {
         // 플레이어 파산 처리
