@@ -210,7 +210,7 @@ function playerPlay(selectedCard, selectedCardDiv) {
             const flippedCard = Game.deck.pop();
             UI.displayFlippedCard(flippedCard);
             if (flippedCard) {
-                handleFlippedCard('player', flippedCard, () => endPlayerTurn(Game.fieldCards.length === 0));
+                handleFlippedCard('player', flippedCard, () => endPlayerTurn(Game.fieldCards.length === 0), selectedCard);
             }
         });
         return;
@@ -236,7 +236,7 @@ function playerPlay(selectedCard, selectedCardDiv) {
         if (flippedCard) {
             handleFlippedCard('player', flippedCard, () => {
                 endPlayerTurn(isSsakSseuri || Game.fieldCards.length === 0);
-            });
+            }, selectedCard);
         } else {
             endPlayerTurn(isSsakSseuri || Game.fieldCards.length === 0);
         }
@@ -252,8 +252,45 @@ function playerPlay(selectedCard, selectedCardDiv) {
     };
 
     if (matchingCardsInField.length === 1) {
-        processMove(matchingCardsInField[0]);
-    } else if (matchingCardsInField.length === 2) {
+        const fieldCardToMatch = matchingCardsInField[0];
+        const fieldCardDiv = UI.fieldDiv.querySelector(`[data-id='${fieldCardToMatch.id}']`);
+
+        // 카드를 내는 애니메이션
+        UI.animateCardMove(selectedCardDiv, fieldCardDiv, () => {
+            // 낸 카드를 손에서 제거
+            Game.setPlayerHand(Game.playerHand.filter((c) => c.id !== selectedCard.id));
+            
+            // 덱에서 카드를 뒤집음
+            const flippedCard = Game.deck.pop();
+            UI.displayFlippedCard(flippedCard);
+
+            // 뻑 발생 조건 체크: 낸 카드, 바닥 카드, 뒤집은 카드가 모두 같은 월
+            if (flippedCard && flippedCard.month === selectedCard.month) {
+                UI.updateStatusMessage("뻑!");
+
+                // 1. 뻑이 된 3장의 카드를 묶음으로 만듦
+                const bbeokGroup = [selectedCard, fieldCardToMatch, flippedCard];
+                Game.setTiedCards([...Game.tiedCards, bbeokGroup]);
+                
+                // 2. 뻑이 된 카드들은 더 이상 일반 바닥 패가 아니므로, fieldCards에서 모두 제거
+                Game.setFieldCards(Game.fieldCards.filter(c => c.id !== fieldCardToMatch.id));
+                
+                updateFullBoard();
+                setTimeout(() => endPlayerTurn(false), 1000); // 턴 종료
+            } else {
+                // 뻑이 아님: 정상적으로 카드 획득
+                Game.acquireCards('player', selectedCard, fieldCardToMatch);
+                
+                // 뒤집은 카드 처리
+                if (flippedCard) {
+                    handleFlippedCard('player', flippedCard, () => endPlayerTurn(Game.fieldCards.length === 0));
+                } else {
+                    endPlayerTurn(Game.fieldCards.length === 0);
+                }
+            }
+        });
+    }
+    else if (matchingCardsInField.length === 2) {
         isPlayerChoiceNeeded = true;
         UI.promptCardSelection(matchingCardsInField, (chosenFieldCard) => {
             const remainingFieldCard = matchingCardsInField.find(c => c.id !== chosenFieldCard.id);
@@ -278,7 +315,7 @@ function playerPlay(selectedCard, selectedCardDiv) {
                          endPlayerTurn(Game.fieldCards.length === 0);
                     });
                 } else if (flippedCard) {
-                    handleFlippedCard('player', flippedCard, () => endPlayerTurn(Game.fieldCards.length === 0));
+                    handleFlippedCard('player', flippedCard, () => endPlayerTurn(Game.fieldCards.length === 0), selectedCard);
                 } else {
                     endPlayerTurn(Game.fieldCards.length === 0);
                 }
@@ -313,7 +350,7 @@ function playerPlay(selectedCard, selectedCardDiv) {
                         endPlayerTurn(Game.fieldCards.length === 0);
                     });
                 } else {
-                    handleFlippedCard('player', flippedCard, () => endPlayerTurn(Game.fieldCards.length === 0));
+                    handleFlippedCard('player', flippedCard, () => endPlayerTurn(Game.fieldCards.length === 0), selectedCard);
                 }
             } else {
                 endPlayerTurn(Game.fieldCards.length === 0);
@@ -323,9 +360,107 @@ function playerPlay(selectedCard, selectedCardDiv) {
 }
 
 // 뒤집은 카드 처리
-function handleFlippedCard(turn, flippedCard, callback) {
+function handleFlippedCard(turn, flippedCard, callback, playedCard, initialTargetFieldCard, playedToField) { // playedToField 인자 추가
+    console.log(`--- Handling Flipped Card for ${turn} ---`);
+    console.log("Flipped Card:", flippedCard ? `${flippedCard.month}월 ${flippedCard.type}` : "(none)");
+    console.log("Field Before:", Game.fieldCards.map(c => `${c.month}월 ${c.type}`), `(${Game.fieldCards.length}장)`);
+    console.log("Acquired Before:", turn === 'player' ? Game.playerAcquired.map(c => `${c.month}월 ${c.type}`) : Game.computerAcquired.map(c => `${c.month}월 ${c.type}`));
+
     const flippedCardDiv = UI.flippedCardContainerDiv.querySelector(`[data-id='${flippedCard.id}']`);
-    const matchingField = Game.fieldCards.filter(c => c.month === flippedCard.month);
+    let matchingField = Game.fieldCards.filter(c => c.month === flippedCard.month); // let으로 변경
+
+    // 컴퓨터 턴일 경우, 낸 카드와 뒤집은 카드의 관계를 여기서 처리
+    if (turn === 'computer') {
+        // 뻑 (낸 카드, 바닥 카드, 뒤집은 카드가 모두 같은 월일 때) 
+        if (playedCard && initialTargetFieldCard && flippedCard &&
+            playedCard.month === flippedCard.month && flippedCard.month ===
+            initialTargetFieldCard.month) {
+            UI.updateStatusMessage("컴퓨터 뻑!");
+            const bbeokGroup = [playedCard, initialTargetFieldCard, flippedCard];
+            Game.setTiedCards([...Game.tiedCards, bbeokGroup]);
+            // 컴퓨터가 이전에 획득했던 카드들을 획득 패에서 제거
+            Game.setComputerAcquired(Game.computerAcquired.filter(c =>
+                c.id !== playedCard.id && c.id !== initialTargetFieldCard.id
+            ));
+            // initialTargetFieldCard는 이미 fieldCards에서 제거되었어야 함 (acquireCards 호출 시)
+            updateFullBoard();
+            if (callback) callback();
+            return; // 뻑 처리 후 함수 종료
+        }
+
+        // 컴퓨터가 낸 카드와 바닥 카드의 초기 매칭 획득 (뻑이 아닌 경우)
+        // 'playedToField'가 false인 경우 (즉, 낸 카드가 바닥 카드와 매칭된 경우)에만 해당
+        if (!playedToField && playedCard && initialTargetFieldCard && playedCard.month === initialTargetFieldCard.month) {
+            Game.acquireCards('computer', playedCard, initialTargetFieldCard);
+        }
+                        
+        // 쪽 (낸 카드와 뒤집은 카드가 같은 월일 때)
+        if (playedCard && flippedCard && playedCard.month === flippedCard.month &&
+            playedToField) { // playedToField가 true여야 쪽
+            UI.updateStatusMessage("컴퓨터 쪽!");
+            const playedCardDivOnField = UI.fieldDiv.querySelector(`[data-id='${playedCard.id}']`);
+            UI.animateCardMove(flippedCardDiv, playedCardDivOnField, () => {
+                Game.acquireCards('computer', playedCard, flippedCard);
+                Game.setFieldCards(Game.fieldCards.filter(c => c.id !== playedCard.id)); // 바닥에서 낸 카드 제거
+                if (Game.takePiFromOpponent('computer')) {
+                    UI.updateStatusMessage(UI.statusMessage.textContent + " 상대방의 피를 1장 가져옵니다.");
+                }
+                if (callback) callback();
+            });
+            return;
+        }
+        // 따닥 (낸 카드와 바닥 카드 2장, 뒤집은 카드와 남은 바닥 카드 1장이 같은 월일 때)
+        // 이 로직은 playerPlay에서 처리되므로, 여기서는 flippedCard가 바닥의 남은 카드와 짝이 맞는지 확인di 
+        /*
+        if (initialTargetFieldCard && flippedCard && flippedCard.month === initialTargetFieldCard.month) {
+            UI.updateStatusMessage(`${playedCard.month}월 따닥! (뒤집은 패 포함)`);
+            const targetFieldCardDiv = UI.fieldDiv.querySelector(`[data-id='${initialTargetFieldCard.id}']`);
+            UI.animateCardMove(flippedCardDiv, targetFieldCardDiv, () => {
+                Game.acquireCards('computer', flippedCard); // 뒤집은 카드만 획득
+                // initialTargetFieldCard는 이미 컴퓨터가 손패를 낼 때 획득했으므로 다시 획득하지 않음
+                // fieldCards에서도 이미 제거되었어야 함
+                if(Game.takePiFromOpponent('computer')) UI.updateStatusMessage(UI.statusMessage.textContent + " 상대 피 1장 가져옴!");
+                if (callback) callback();
+            });
+            return;
+        }
+        */
+    }
+
+
+
+    // 뻑 (플레이어가 낸 카드와 뒤집은 카드가 같은 월이고, 바닥에 이미 1장이 깔려있을 때)
+    if (turn === 'player' && playedCard && playedCard.month === flippedCard.month && matchingField.length === 1) {
+        UI.updateStatusMessage("뻑!");
+        const bbeokGroup = [playedCard, flippedCard, matchingField[0]];
+        Game.setTiedCards([...Game.tiedCards, bbeokGroup]); // 묶인 카드로 추가
+        Game.setFieldCards(Game.fieldCards.filter(c => c.id !== matchingField[0].id)); // 바닥에서 제거
+        // 플레이어가 먹었던 카드를 다시 뱉어내야 함
+        Game.playerAcquired = Game.playerAcquired.filter(c => c.id !== playedCard.id && c.id !== matchingField[0].id);
+        updateFullBoard();
+        if (callback) callback();
+        return;
+    }
+
+    // 컴퓨터 턴의 뻑 (낸 카드, 바닥 카드, 뒤집은 카드가 모두 같은 월일 때)
+    if (turn === 'computer' && playedCard && initialTargetFieldCard && flippedCard &&
+        playedCard.month === flippedCard.month && flippedCard.month === initialTargetFieldCard.month) {
+
+        UI.updateStatusMessage("컴퓨터 뻑!");
+        const bbeokGroup = [playedCard, initialTargetFieldCard, flippedCard];
+        Game.setTiedCards([...Game.tiedCards, bbeokGroup]);
+
+        // 컴퓨터가 이전에 획득했던 카드들을 획득 패에서 제거
+        Game.computerAcquired = Game.computerAcquired.filter(c =>
+            c.id !== playedCard.id && c.id !== initialTargetFieldCard.id
+        );
+        // initialTargetFieldCard는 이미 컴퓨터가 손패를 낼 때 획득했으므로 다시 획득하지 않음
+        // fieldCards에서도 이미 제거되었어야 함
+
+        updateFullBoard();
+        if (callback) callback();
+        return; // 뻑 처리 후 함수 종료
+    }
 
     const processFlippedCard = (fieldCard) => {
         const fieldCardDiv = UI.fieldDiv.querySelector(`[data-id='${fieldCard.id}']`);
@@ -371,7 +506,9 @@ function handleFlippedCard(turn, flippedCard, callback) {
             if (callback) callback();
         });
     } else { // 짝이 없을 때
-        Game.fieldCards.push(flippedCard);
+        if (flippedCard) { // flippedCard가 null이 아닐 때만 바닥에 추가
+            Game.fieldCards.push(flippedCard);
+        }
         if (callback) callback();
     }
     return false;
@@ -443,6 +580,11 @@ function handlePlayerBomb(bombSet, fieldCard) { // fieldCard는 이제 단일 �
 
 // --- 컴퓨터 턴 로직 ---
 function computerTurn() {
+    console.log("--- Computer Turn Start ---");
+    console.log("Computer Hand:", Game.computerHand.map(c => `${c.month}월 ${c.type}`), `(${Game.computerHand.length}장)`);
+    console.log("Field Cards:", Game.fieldCards.map(c => `${c.month}월 ${c.type}`), `(${Game.fieldCards.length}장)`);
+    console.log("Deck:", Game.deck.length, "cards remaining");
+
     if (Game.computerHand.length === 0) {
         checkGameOver();
         return;
@@ -511,50 +653,18 @@ function computerTurn() {
 
     const performComputerTurnLogic = () => {
         Game.setComputerHand(Game.computerHand.filter(c => c.id !== playedCard.id));
-        if (targetFieldCard) {
-            Game.acquireCards('computer', playedCard, targetFieldCard);
-        } else if (playedToField) {
-            Game.fieldCards.push(playedCard);
-        } else { // 3장 먹기 (이미 위에서 처리되었을 수 있음)
-            const matching = Game.fieldCards.filter(c => c.month === playedCard.month);
-            Game.acquireCards('computer', playedCard, ...matching);
-        }
-        updateFullBoard();
+        // 컴퓨터가 낸 카드를 바로 획득하지 않고, handleFlippedCard에서 처리하도록 변경
+        updateFullBoard(); // UI 업데이트를 위해 호출 (필요시)
 
         setTimeout(() => {
             const flippedCard = Game.deck.pop();
+            console.log("Computer flips:", flippedCard ? `${flippedCard.month}월 ${flippedCard.type}`: "(no card)");
             UI.displayFlippedCard(flippedCard);
 
-            if (flippedCard) {
-                const isJjok = playedToField && playedCard.month === flippedCard.month;
-                const flippedCardDiv = UI.flippedCardContainerDiv.querySelector(`[data-id='${flippedCard.id}']`);
+            // 뒤집은 카드 처리 (쪽, 따닥, 뻑, 일반 획득 등 모든 로직을 handleFlippedCard에서 처리)
+            // playedToField 인자를 추가하여 handleFlippedCard에서 낸 카드를 바닥에 놓을지 결정
+            handleFlippedCard('computer', flippedCard, () => endComputerTurn(Game.fieldCards.length === 0), playedCard, targetFieldCard, playedToField);
 
-                if (isJjok) {
-                    UI.updateStatusMessage("컴퓨터 쪽!");
-                    const playedCardDivOnField = UI.fieldDiv.querySelector(`[data-id='${playedCard.id}']`);
-                    UI.animateCardMove(flippedCardDiv, playedCardDivOnField, () => {
-                        Game.acquireCards('computer', playedCard, flippedCard);
-                        Game.setFieldCards(Game.fieldCards.filter(c => c.id !== playedCard.id));
-                        if (Game.takePiFromOpponent('computer')) {
-                            UI.updateStatusMessage("컴퓨터 쪽! 상대방의 피를 1장 가져옵니다.");
-                        }
-                        endComputerTurn(Game.fieldCards.length === 0);
-                    });
-                } else if (targetFieldCard && flippedCard.month === targetFieldCard.month) { // 따닥 후 뒤집기
-                    UI.updateStatusMessage(`${playedCard.month}월 따닥! (뒤집은 패 포함)`);
-                    const targetFieldCardDiv = UI.fieldDiv.querySelector(`[data-id='${targetFieldCard.id}']`);
-                    UI.animateCardMove(flippedCardDiv, targetFieldCardDiv, () => {
-                        Game.acquireCards('computer', flippedCard, targetFieldCard);
-                        Game.setFieldCards(Game.fieldCards.filter(c => c.id !== targetFieldCard.id));
-                        if(Game.takePiFromOpponent('computer')) UI.updateStatusMessage(UI.statusMessage.textContent + " 상대 피 1장 가져옴!");
-                        endComputerTurn(Game.fieldCards.length === 0);
-                    });
-                } else {
-                    handleFlippedCard('computer', flippedCard, () => endComputerTurn(Game.fieldCards.length === 0));
-                }
-            } else {
-                endComputerTurn(Game.fieldCards.length === 0);
-            }
         }, 500); // 뒤집는 카드 애니메이션을 위한 딜레이
     };
 

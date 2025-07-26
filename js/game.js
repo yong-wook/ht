@@ -229,6 +229,9 @@ export function setComputerScore(score) {
     computerScore = score;
 }
 
+export function setPlayerAcquired(newAcquired) { playerAcquired = newAcquired; }
+export function setComputerAcquired(newAcquired) { computerAcquired = newAcquired; }
+
 export function setPlayerMoney(amount) {
     playerMoney = amount;
 }
