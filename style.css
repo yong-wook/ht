@@ -903,7 +903,7 @@ h2, h3 {
 }
 
 .colliding {
-    animation: card-collide 1s ease-in-out;
+    animation: card-collide 0.5s ease-in-out;
 }
 
 .card-clone {

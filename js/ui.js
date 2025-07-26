@@ -175,6 +175,7 @@ export function animateCardMove(startElement, targetElement, callback) {
     clone.style.left = `${startRect.left}px`;
     clone.style.top = `${startRect.top}px`;
 
+    clone.style.transition = 'all 0.3s ease-in-out'; // 애니메이션 시간 단축
     document.body.appendChild(clone);
     startElement.style.opacity = '0'; // 원래 카드 숨기기
 
@@ -189,9 +190,15 @@ export function animateCardMove(startElement, targetElement, callback) {
     clone.addEventListener('transitionend', () => {
         clone.remove();
         startElement.style.opacity = '1'; // 원래 카드 다시 표시
-        if (callback) {
-            callback();
-        }
+
+        // 흔들림 효과 추가
+        targetElement.classList.add('colliding');
+        setTimeout(() => {
+            targetElement.classList.remove('colliding');
+            if (callback) {
+                callback();
+            }
+        }, 500); // card-collide 애니메이션 시간과 동일하게 설정
     }, { once: true });
 }
 
