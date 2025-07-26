@@ -30,7 +30,7 @@ export function displayCards(cards, container, isPlayer, playerPlayCallback) {
         }
         cardDiv.dataset.id = card.id;
         if (isPlayer) {
-            cardDiv.addEventListener("click", () => playerPlayCallback(card));
+            cardDiv.addEventListener("click", () => playerPlayCallback(card, cardDiv));
         }
         container.appendChild(cardDiv);
     });
@@ -158,6 +158,41 @@ export function updateBoard(gameState, playerPlayCallback) {
     playerScoreSpan.textContent = playerScore;
     computerScoreSpan.textContent = computerScore;
     updateMoneyDisplay(playerMoney, computerMoney);
+}
+
+// 카드 이동 및 충돌 애니메이션
+export function animateCardMove(startElement, targetElement, callback) {
+    if (!startElement || !targetElement) {
+        if (callback) callback();
+        return;
+    }
+
+    const startRect = startElement.getBoundingClientRect();
+    const targetRect = targetElement.getBoundingClientRect();
+
+    const clone = startElement.cloneNode(true);
+    clone.classList.add('card-clone');
+    clone.style.left = `${startRect.left}px`;
+    clone.style.top = `${startRect.top}px`;
+
+    document.body.appendChild(clone);
+    startElement.style.opacity = '0'; // 원래 카드 숨기기
+
+    // 1. 복제된 카드를 목표 위치로 이동
+    requestAnimationFrame(() => {
+        // 강제로 reflow 발생시켜 CSS 트랜지션이 적용될 시간을 줌
+        clone.offsetWidth; 
+        clone.style.transform = `translate(${targetRect.left - startRect.left}px, ${targetRect.top - startRect.top}px)`;
+    });
+
+    // 2. 이동 애니메이션이 끝난 후 콜백 실행 및 정리
+    clone.addEventListener('transitionend', () => {
+        clone.remove();
+        startElement.style.opacity = '1'; // 원래 카드 다시 표시
+        if (callback) {
+            callback();
+        }
+    }, { once: true });
 }
 
 // 판돈 표시 업데이트 (게임 보드 내)
