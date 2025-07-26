@@ -888,3 +888,26 @@ h2, h3 {
 .card-back {
     background-color: #C8242F; /* 화투 뒷면 색 (붉은색 계열) */
 }
+
+/* 카드 충돌 애니메이션 */
+@keyframes card-collide {
+    0% {
+        transform: scale(1) rotate(0deg);
+    }
+    50% {
+        transform: scale(1.5) rotate(15deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+.colliding {
+    animation: card-collide 1s ease-in-out;
+}
+
+.card-clone {
+    position: absolute;
+    transition: all 0.5s ease-in-out;
+    z-index: 1100; /* 다른 카드들 위에 보이도록 */
+}
