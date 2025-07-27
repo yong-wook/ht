@@ -4,7 +4,7 @@ import * as UI from './ui.js';
 import { handleFlippedCard, handleGo, handleStop } from './game_logic.js';
 import { endPlayerTurn } from './turn_manager.js';
 
-function handleDeckClick() {
+export function handleDeckClick() {
     // 추가 뒤집기 기회가 있을 때만 작동
     if (Game.extraFlipOwner === 'player' && Game.getExtraFlipsRemaining() > 0) {
         // 1. 추가 뒤집기 실행

@@ -2,6 +2,7 @@
 import * as Game from './game.js';
 import * as UI from './ui.js';
 import { handleFlippedCard, handlePlayerBomb, checkGameOver, getCardValue } from './game_logic.js';
+import { handleDeckClick } from './event_handlers.js';
 import { updateFullBoard } from './main.js';
 
 // --- 플레이어 턴 로직 ---
