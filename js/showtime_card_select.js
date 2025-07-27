@@ -25,7 +25,7 @@ export function showCardSelection(items, callback) {
     onCardSelectCallback = callback;
     weightedItems = items.map((item, index) => ({
         value: item, // item은 {name: '1월', ...} 형태
-        weight: items.length - index // 기존 룰렛 로직처럼 인덱스가 낮을수록 높은 가중치
+        weight: (items.length - index) + 3 // 12월이 더 자주 나오도록 가중치 조정
     }));
 
     // 1. 결과 미리 결정
