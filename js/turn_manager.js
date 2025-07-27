@@ -233,7 +233,32 @@ export function computerTurn() {
             playedCard = cardInHand;
             targetFieldCard = matchingCardsInField[0]; // 애니메이션을 위해 첫 번째 카드 선택
             UI.updateStatusMessage(`컴퓨터 ${cardInHand.month}월 4장 한번에 획득!`);
-            break;
+
+            // Directly acquire all 4 cards here
+            Game.acquireCards('computer', playedCard, ...matchingCardsInField);
+            Game.setComputerHand(Game.computerHand.filter(c => c.id !== playedCard.id));
+            Game.setFieldCards(Game.fieldCards.filter(c => c.month !== playedCard.month)); // Remove all cards of that month from field
+
+            updateFullBoard(); // Update UI after acquisition
+
+            // Now, proceed to flip a card, but this is a separate action
+            setTimeout(() => {
+                const flippedCard = Game.deck.pop();
+                console.log("Computer flips (after 4-card acquisition):", flippedCard ? `${flippedCard.month}월 ${flippedCard.type}`: "(no card)");
+                UI.displayFlippedCard(flippedCard);
+
+                // Handle the flipped card independently
+                if (flippedCard) {
+                    // If the flipped card matches anything on the field, acquire it.
+                    // Otherwise, add it to the field.
+                    // No playedCard or targetFieldCard for this flipped card, as the main play is done.
+                    handleFlippedCard('computer', flippedCard, () => endComputerTurn(Game.fieldCards.length === 0));
+                } else {
+                    endComputerTurn(Game.fieldCards.length === 0);
+                }
+            }, 500); // Delay for animation
+
+            return; // Exit computerTurn after handling 4-card acquisition
         }
     }
 

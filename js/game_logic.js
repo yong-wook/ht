@@ -73,7 +73,8 @@ export function handleFlippedCard(turn, flippedCard, callback, playedCard, targe
             targetFieldCard.month) {
             UI.updateStatusMessage("컴퓨터 뻑!");
             const bbeokGroup = [playedCard, targetFieldCard, flippedCard];
-            Game.setTiedCards([...Game.tiedCards, bbeokGroup]);
+            Game.acquireCards('computer', ...bbeokGroup); // 컴퓨터가 뻑 카드들을 획득
+            Game.setTiedCards([...Game.tiedCards, bbeokGroup]); // 묶인 카드로 추가 (선택 사항, 획득했으므로 필요 없을 수도 있음)
             Game.setFieldCards(Game.fieldCards.filter(c => c.id !== targetFieldCard.id)); // 바닥에서 제거
             updateFullBoard();
             if (callback) callback();
