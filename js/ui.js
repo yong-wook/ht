@@ -248,7 +248,22 @@ export function showResultModal(winner, finalScore, moneyWon, breakdown) {
         titleHtml = '<h2>무승부</h2>';
     }
 
-    const breakdownHtml = breakdown.join('<br>');
+    const breakdownHtml = breakdown.map(item => {
+        let className = 'score-breakdown-item';
+        if (item.includes('청단')) className += ' cheongdan';
+        else if (item.includes('홍단')) className += ' hongdan';
+        else if (item.includes('초단')) className += ' chodan';
+        else if (item.includes('고도리')) className += ' godori';
+        else if (item.includes('광박')) className += ' gwangbak';
+        else if (item.includes('피박')) className += ' pibak';
+        else if (item.includes('고박')) className += ' gobak';
+        else if (item.includes('흔들기')) className += ' shake';
+        else if (item.includes('폭탄')) className += ' bomb';
+        else if (item.includes('고')) className += ' go-count';
+        else if (item.includes('승리 보너스')) className += ' roulette-bonus';
+        
+        return `<div class="${className}">${item}</div>`;
+    }).join('');
 
     modal.innerHTML = `
         ${titleHtml}
@@ -266,6 +281,21 @@ export function showResultModal(winner, finalScore, moneyWon, breakdown) {
     document.getElementById('close-result-modal').addEventListener('click', () => {
         modal.remove();
     });
+}
+
+export function showComboAchieved(comboName) {
+    const comboDiv = document.createElement('div');
+    comboDiv.classList.add('combo-achieved-message');
+    comboDiv.textContent = `${comboName} 달성!`;
+    document.body.appendChild(comboDiv);
+
+    // 애니메이션 및 제거
+    setTimeout(() => {
+        comboDiv.classList.add('fade-out');
+        comboDiv.addEventListener('transitionend', () => {
+            comboDiv.remove();
+        }, { once: true });
+    }, 1500); // 1.5초 후 사라지기 시작
 }
 
 export function promptCardSelection(cardsToSelect, callback) {

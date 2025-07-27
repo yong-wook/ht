@@ -217,6 +217,11 @@ export function handleStop() {
     let winner = '';
     let breakdown = [];
 
+    // 족보 달성 알림 (게임 중)
+    if (playerResult.combos && playerResult.combos.length > 0) {
+        playerResult.combos.forEach(combo => UI.showComboAchieved(combo));
+    }
+
     if (finalPlayerScore > finalComputerScore) {
         winner = 'player';
         breakdown = playerResult.breakdown;
@@ -282,6 +287,12 @@ export function handleStop() {
     } else if (finalComputerScore > finalPlayerScore) {
         winner = 'computer';
         breakdown = computerResult.breakdown;
+
+        // 족보 달성 알림 (게임 중)
+        if (computerResult.combos && computerResult.combos.length > 0) {
+            computerResult.combos.forEach(combo => UI.showComboAchieved(combo));
+        }
+
         // 피박, 광박
         const playerPiCount = Game.playerAcquired.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : (cur.type === 'pi' ? 1 : 0)), 0);
         if (computerResult.breakdown.some(b => b.startsWith('피')) && playerPiCount < 5) {

@@ -132,6 +132,7 @@ export function calculateScore(acquiredCards) {
 
     let score = 0;
     let breakdown = [];
+    let combos = []; // combos 배열 초기화
     const gwang = acquiredCards.filter(c => c.type === 'gwang');
     const tti = acquiredCards.filter(c => c.type === 'tti');
     const ggot = acquiredCards.filter(c => c.type === 'ggot');
@@ -164,9 +165,9 @@ export function calculateScore(acquiredCards) {
     const cheongdan = tti.filter(c => c.dan === 'cheong');
     const chodan = tti.filter(c => c.dan === 'cho');
 
-    if (hongdan.length === 3) { score += 3; breakdown.push("홍단 (3점)"); }
-    if (cheongdan.length === 3) { score += 3; breakdown.push("청단 (3점)"); }
-    if (chodan.length === 3) { score += 3; breakdown.push("초단 (3점)"); }
+    if (hongdan.length === 3) { score += 3; breakdown.push("홍단 (3점)"); combos.push('홍단'); }
+    if (cheongdan.length === 3) { score += 3; breakdown.push("청단 (3점)"); combos.push('청단'); }
+    if (chodan.length === 3) { score += 3; breakdown.push("초단 (3점)"); combos.push('초단'); }
 
     // 끗(동물) 점수
     const godoriMonths = [2, 4, 8];
@@ -174,6 +175,7 @@ export function calculateScore(acquiredCards) {
     if (godoriCards.length === 3) {
         score += 5;
         breakdown.push("고도리 (5점)");
+        combos.push('고도리');
     }
     if (ggot.length >= 5) {
         const ggotScore = ggot.length - 4;
@@ -195,7 +197,7 @@ export function calculateScore(acquiredCards) {
         breakdown.push(`룰렛 보너스: 점수 ${currentRoundBonusMultiplier}배`);
     }
 
-    return { score, breakdown };
+    return { score, breakdown, combos };
 }
 
 // 라운드 종료 후 판돈 계산
