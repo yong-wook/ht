@@ -23,6 +23,7 @@ export let currentRoundBonusMultiplier = 1; // 점수 배율
 export let currentRoundAddSsangpi = 0; // 추가 쌍피 수
 export let currentRoundAddGwang = 0; // 추가 광 수
 export let currentRoundWinMultiplier = 1; // 승리 시 점수 배율
+export let currentRouletteReward = null; // 현재 룰렛 보상 효과
 
 // 추가 뒤집기 횟수
 export let extraFlipsRemaining = 0;
@@ -31,6 +32,10 @@ export let extraFlipOwner = null; // 추가 뒤집기 기회를 가진 플레이
 // 추가 뒤집기 소유자 설정
 export function setExtraFlipOwner(owner) {
     extraFlipOwner = owner;
+}
+
+export function setCurrentRouletteReward(reward) {
+    currentRouletteReward = reward;
 }
 
 // 컴퓨터 판돈 설정
