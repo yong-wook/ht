@@ -312,6 +312,12 @@ export function computerTurn() {
 
     const performComputerTurnLogic = () => {
         Game.setComputerHand(Game.computerHand.filter(c => c.id !== playedCard.id));
+        
+        // 바닥에 카드를 내는 경우, fieldCards에 추가
+        if (playedToField) {
+            Game.fieldCards.push(playedCard);
+        }
+
         // 컴퓨터가 낸 카드를 바로 획득하지 않고, handleFlippedCard에서 처리하도록 변경
         updateFullBoard(); // UI 업데이트를 위해 호출 (필요시)
 
