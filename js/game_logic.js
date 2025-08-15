@@ -140,7 +140,7 @@ export function handleFlippedCard(turn, flippedCard, callback, playedCard, targe
             }
             if (callback) callback();
         });
-        return false;
+        return; // 여기서 함수 실행을 종료시켜야 뒤쪽 로직에서 flippedCard를 바닥에 다시 깔지 않음
     }
 
     if (matchingField.length === 1) {
@@ -217,11 +217,6 @@ export function handleStop() {
     let winner = '';
     let breakdown = [];
 
-    // 족보 달성 알림 (게임 중)
-    if (playerResult.combos && playerResult.combos.length > 0) {
-        playerResult.combos.forEach(combo => UI.showComboAchieved(combo));
-    }
-
     if (finalPlayerScore > finalComputerScore) {
         winner = 'player';
         breakdown = playerResult.breakdown;
@@ -287,11 +282,6 @@ export function handleStop() {
     } else if (finalComputerScore > finalPlayerScore) {
         winner = 'computer';
         breakdown = computerResult.breakdown;
-
-        // 족보 달성 알림 (게임 중)
-        if (computerResult.combos && computerResult.combos.length > 0) {
-            computerResult.combos.forEach(combo => UI.showComboAchieved(combo));
-        }
 
         // 피박, 광박
         const playerPiCount = Game.playerAcquired.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : (cur.type === 'pi' ? 1 : 0)), 0);

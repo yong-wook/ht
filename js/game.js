@@ -1,3 +1,5 @@
+import * as UI from './ui.js';
+
 // 게임 상태 변수들
 export let playerHand = [];
 export let computerHand = [];
@@ -12,6 +14,9 @@ export let playerShakeCount = 0;
 export let tiedCards = []; // 뻑으로 묶인 카드 그룹 (2차원 배열)
 export let playerScore = 0;
 export let computerScore = 0;
+export let playerCombos = []; // 플레이어 현재 족보
+export let computerCombos = []; // 컴퓨터 현재 족보
+
 
 // 판돈 관련 변수
 export let playerMoney = 100000; // 플레이어 초기 자금
@@ -74,6 +79,8 @@ export function dealCards(CARDS) {
     playerBombCount = 0;
     playerShakeCount = 0;
     tiedCards = [];
+    playerCombos = [];
+    computerCombos = [];
     deck = [...CARDS];
     shuffleDeck();
 
@@ -104,6 +111,31 @@ export function acquireCards(turn, ...cardsToAcquire) {
     }
 
     fieldCards = fieldCards.filter(fieldCard => !allCards.some(ac => ac.id === fieldCard.id));
+
+    // 족보 달성 확인
+    checkNewCombos(turn);
+}
+
+// 족보 달성 확인 및 메시지 표시
+function checkNewCombos(turn) {
+    const currentAcquired = turn === 'player' ? playerAcquired : computerAcquired;
+    const oldCombos = turn === 'player' ? playerCombos : computerCombos;
+    
+    const { combos: newCombos } = calculateScore(currentAcquired);
+
+    if (newCombos.length > oldCombos.length) {
+        const newlyAchieved = newCombos.filter(c => !oldCombos.includes(c));
+        newlyAchieved.forEach(combo => {
+            UI.showComboAchieved(combo);
+        });
+    }
+
+    // 족보 상태 업데이트
+    if (turn === 'player') {
+        playerCombos = newCombos;
+    } else {
+        computerCombos = newCombos;
+    }
 }
 
 // 상대방 피 가져오기
