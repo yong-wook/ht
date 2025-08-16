@@ -184,38 +184,42 @@ export function handleGameEnd() {
 function initializeApp() {
     Game.loadGameData();
     UI.updateTotalMoneyDisplay(Game.playerMoney); // 소지금 표시
-    titleImage.addEventListener('click', () => { // startGameButton 대신 titleImage 클릭 이벤트
-        // 전체 화면 요청
-        if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen();
-        } else if (document.documentElement.mozRequestFullScreen) { /* Firefox */
-            document.documentElement.mozRequestFullScreen();
-        } else if (document.documentElement.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
-            document.documentElement.webkitRequestFullscreen();
-        } else if (document.documentElement.msRequestFullscreen) { /* IE/Edge */
-            document.documentElement.msRequestFullscreen();
+
+    const dontShowAgainCheckbox = document.getElementById('dont-show-again-checkbox');
+
+    const showStageSelect = () => {
+        openingCrawl.style.display = 'none';
+        stageSelectionContainer.style.display = 'block';
+        Stage.initStageSelection(startGame);
+    };
+
+    const handleIntroEnd = () => {
+        if (dontShowAgainCheckbox.checked) {
+            Game.setSkipIntro(true);
         }
+        showStageSelect();
+    };
 
+    if (Game.skipIntro) {
         startScreen.style.display = 'none';
-        openingCrawl.style.display = 'flex'; // 오프닝 크롤 표시
+        showStageSelect();
+    } else {
+        titleImage.addEventListener('click', () => {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            }
 
-        const crawlText = openingCrawl.querySelector('.crawl-text');
-        // 애니메이션이 끝나면 스테이지 선택 화면으로 전환
-        crawlText.addEventListener('animationend', () => {
-            openingCrawl.style.display = 'none';
-            stageSelectionContainer.style.display = 'block';
-            Stage.initStageSelection(startGame);
-        });
+            startScreen.style.display = 'none';
+            openingCrawl.style.display = 'flex';
 
-        // 스킵 버튼 이벤트 리스너
-        skipButton.addEventListener('click', () => {
-            // 애니메이션 즉시 종료 및 스테이지 선택 화면으로 전환
-            crawlText.style.animationPlayState = 'paused'; // 애니메이션 일시 정지
-            openingCrawl.style.display = 'none';
-            stageSelectionContainer.style.display = 'block';
-            Stage.initStageSelection(startGame);
+            const crawlText = openingCrawl.querySelector('.crawl-text');
+            crawlText.addEventListener('animationend', handleIntroEnd, { once: true });
+            skipButton.addEventListener('click', () => {
+                crawlText.style.animationPlayState = 'paused';
+                handleIntroEnd();
+            }, { once: true });
         });
-    });
+    }
 
     initializeEventListeners();
 }

@@ -1,3 +1,4 @@
+
 import * as UI from './ui.js';
 
 // 게임 상태 변수들
@@ -16,6 +17,7 @@ export let playerScore = 0;
 export let computerScore = 0;
 export let playerCombos = []; // 플레이어 현재 족보
 export let computerCombos = []; // 컴퓨터 현재 족보
+export let skipIntro = false; // 인트로 건너뛰기 설정
 
 
 // 판돈 관련 변수
@@ -329,11 +331,17 @@ export function deductPlayerMoney(amount) {
 export let unlockedStages = [1]; // 기본적으로 스테이지 1은 해제됨
 export let unlockedBackgrounds = {}; // 예: { '1': [3, 8], '2': [1] }
 
+export function setSkipIntro(value) {
+    skipIntro = value;
+    saveGameData();
+}
+
 export function saveGameData() {
     const data = {
         playerMoney: playerMoney,
         unlockedStages: unlockedStages,
-        unlockedBackgrounds: unlockedBackgrounds // 배경 정보 추가
+        unlockedBackgrounds: unlockedBackgrounds, // 배경 정보 추가
+        skipIntro: skipIntro // 인트로 건너뛰기 설정 저장
     };
     localStorage.setItem('goStopSaveData', JSON.stringify(data));
 }
@@ -345,10 +353,12 @@ export function loadGameData() {
         playerMoney = data.playerMoney;
         unlockedStages = data.unlockedStages;
         unlockedBackgrounds = data.unlockedBackgrounds || {}; // 이전 버전 저장 데이터 호환
+        skipIntro = data.skipIntro || false; // 인트로 건너뛰기 설정 불러오기
     } else {
         // 기본값 설정
         playerMoney = 100000;
         unlockedStages = [1];
         unlockedBackgrounds = {};
+        skipIntro = false;
     }
 }

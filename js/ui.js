@@ -191,14 +191,20 @@ export function animateCardMove(startElement, targetElement, callback) {
         clone.remove();
         startElement.style.opacity = '1'; // 원래 카드 다시 표시
 
-        // 흔들림 효과 추가
-        targetElement.classList.add('colliding');
-        setTimeout(() => {
-            targetElement.classList.remove('colliding');
+        // 목표가 전체 필드가 아닐 경우에만 흔들림 효과 추가
+        if (targetElement !== fieldDiv) {
+            targetElement.classList.add('colliding');
+            setTimeout(() => {
+                targetElement.classList.remove('colliding');
+                if (callback) {
+                    callback();
+                }
+            }, 500); // card-collide 애니메이션 시간과 동일하게 설정
+        } else {
             if (callback) {
                 callback();
             }
-        }, 500); // card-collide 애니메이션 시간과 동일하게 설정
+        }
     }, { once: true });
 }
 

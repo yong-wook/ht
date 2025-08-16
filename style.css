@@ -528,6 +528,20 @@ h2, h3 {
     background-color: #45a049;
 }
 
+.skip-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    z-index: 1001;
+}
+
 /* 모바일 반응형 */
 @media screen and (max-width: 768px) {
     body {

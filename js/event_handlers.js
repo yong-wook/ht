@@ -1,28 +1,11 @@
 
 import * as Game from './game.js';
 import * as UI from './ui.js';
-import { handleFlippedCard, handleGo, handleStop } from './game_logic.js';
-import { endPlayerTurn } from './turn_manager.js';
+import { handleGo, handleStop, handleExtraFlip } from './turn_manager.js';
 
 export function handleDeckClick() {
-    // 추가 뒤집기 기회가 있을 때만 작동
-    if (Game.extraFlipOwner === 'player' && Game.getExtraFlipsRemaining() > 0) {
-        // 1. 추가 뒤집기 실행
-        const flippedCard = Game.deck.pop();
-        UI.displayFlippedCard(flippedCard);
-        if (flippedCard) {
-            const flippedCardDiv = UI.flippedCardContainerDiv.querySelector(`[data-id='${flippedCard.id}']`);
-            handleFlippedCard('player', flippedCard, () => {
-                Game.decrementExtraFlips();
-                UI.deckDiv.removeEventListener('click', handleDeckClick);
-                endPlayerTurn(Game.fieldCards.length === 0);
-            });
-        } else {
-            Game.decrementExtraFlips();
-            UI.deckDiv.removeEventListener('click', handleDeckClick);
-            endPlayerTurn(Game.fieldCards.length === 0);
-        }
-    }
+    // 추가 뒤집기 기회 확인 및 실행은 handleExtraFlip 내부에서 처리
+    handleExtraFlip('player');
 }
 
 export function initializeEventListeners() {
