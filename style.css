@@ -497,6 +497,15 @@ h3 {
     align-items: center;
     position: relative;
     margin: 10px 0;
+    cursor: grab;
+    /* 드래그 가능 커서 */
+    touch-action: none;
+    /* 브라우저 기본 터치 동작 방지 */
+}
+
+.showtime-image-wrapper:active {
+    cursor: grabbing;
+    /* 드래그 중 커서 */
 }
 
 /* God rays 효과 */
@@ -553,18 +562,41 @@ h3 {
 }
 
 .showtime-image-wrapper img {
-    max-width: 100%;
-    max-height: 100%;
+    /* 원본 크기 표시를 위해 크기 제한 제거 */
+    max-width: none;
+    max-height: none;
     width: auto;
     height: auto;
-    object-fit: contain;
-    animation: spotlight-reveal 1.5s ease-in-out forwards;
-    /* 시간 단축 */
-    cursor: pointer;
+
+    /* 위치 제어를 위한 설정 */
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    /* 초기 중앙 정렬 */
+
+    /* 애니메이션 수정 (위치 이동과 충돌 방지 위해 transform 관련 제거하고 opacity만 사용하거나 JS로 제어) */
+    animation: fade-in 0.5s ease-in-out forwards;
+
+    cursor: grab;
     z-index: 1;
     /* God rays 위에 표시 */
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
     /* 이미지 자체 발광 */
+    user-select: none;
+    /* 이미지 선택 방지 */
+    -webkit-user-drag: none;
+    /* 이미지 드래그 방지 */
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes scanAndZoomOut {
