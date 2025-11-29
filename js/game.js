@@ -12,6 +12,8 @@ export let playerGoCount = 0;
 export let computerGoCount = 0;
 export let playerBombCount = 0;
 export let playerShakeCount = 0;
+export let computerBombCount = 0;
+export let computerShakeCount = 0;
 export let tiedCards = []; // 뻑으로 묶인 카드 그룹 (2차원 배열)
 export let playerScore = 0;
 export let computerScore = 0;
@@ -59,15 +61,15 @@ export function setInitialMoney(stageInitialMoney) {
 
 // 덱 생성
 export function createDeck(CARDS) {
-	deck = [...CARDS];
+    deck = [...CARDS];
 }
 
 // 덱 섞기
 export function shuffleDeck() {
-	for (let i = deck.length - 1; i > 0; i--) {
-		const j = Math.floor(Math.random() * (i + 1));
-		[deck[i], deck[j]] = [deck[j], deck[i]];
-	}
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
 }
 
 // 카드 분배
@@ -80,6 +82,8 @@ export function dealCards(CARDS) {
     playerGoCount = 0;
     playerBombCount = 0;
     playerShakeCount = 0;
+    computerBombCount = 0;
+    computerShakeCount = 0;
     tiedCards = [];
     playerCombos = [];
     computerCombos = [];
@@ -93,13 +97,13 @@ export function dealCards(CARDS) {
     currentRoundWinMultiplier = 1;
     extraFlipsRemaining = 0; // 추가 뒤집기 횟수 초기화
 
-	for (let i = 0; i < 10; i++) {
-		playerHand.push(deck.pop());
-		computerHand.push(deck.pop());
-	}
-	for (let i = 0; i < 8; i++) {
-		fieldCards.push(deck.pop());
-	}
+    for (let i = 0; i < 10; i++) {
+        playerHand.push(deck.pop());
+        computerHand.push(deck.pop());
+    }
+    for (let i = 0; i < 8; i++) {
+        fieldCards.push(deck.pop());
+    }
 }
 
 // 카드 획득 처리
@@ -122,7 +126,7 @@ export function acquireCards(turn, ...cardsToAcquire) {
 function checkNewCombos(turn) {
     const currentAcquired = turn === 'player' ? playerAcquired : computerAcquired;
     const oldCombos = turn === 'player' ? playerCombos : computerCombos;
-    
+
     const { combos: newCombos } = calculateScore(currentAcquired);
 
     if (newCombos.length > oldCombos.length) {
@@ -141,13 +145,20 @@ function checkNewCombos(turn) {
 }
 
 // 상대방 피 가져오기
+// 상대방 피 가져오기
 export function takePiFromOpponent(taker) {
     const opponent = taker === 'player' ? 'computer' : 'player';
     const opponentAcquired = opponent === 'player' ? playerAcquired : computerAcquired;
     const opponentPi = opponentAcquired.filter(c => c.type === 'pi' || c.type === 'ssangpi');
 
     if (opponentPi.length > 0) {
-        const piToTake = opponentPi[0]; // 쌍피든 일반 피든 하나 가져옴
+        // 일반 피(pi)를 우선적으로 찾음
+        let piToTake = opponentPi.find(c => c.type === 'pi');
+        // 일반 피가 없으면 쌍피(ssangpi)를 가져옴 (어쩔 수 없이 쌍피 뺏김)
+        if (!piToTake) {
+            piToTake = opponentPi[0];
+        }
+
         if (opponent === 'player') {
             playerAcquired = playerAcquired.filter(c => c.id !== piToTake.id);
             computerAcquired.push(piToTake);
@@ -285,6 +296,8 @@ export function setTiedCards(newCards) { tiedCards = newCards; }
 export function incrementPlayerGo() { playerGoCount++; }
 export function incrementPlayerBomb() { playerBombCount++; }
 export function incrementPlayerShake() { playerShakeCount++; }
+export function incrementComputerBomb() { computerBombCount++; }
+export function incrementComputerShake() { computerShakeCount++; }
 
 // 룰렛 보너스 설정 함수
 export function setRouletteBonus(type, value) {

@@ -1,17 +1,20 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>고스톱</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div id="player-total-money-container">
         <span>내 소지금: </span><span id="player-total-money">0</span>원
     </div>
     <div id="start-screen">
-        <img id="title-image" src="images/title_image.png" alt="게임 타이틀 이미지" style="max-width: 80%; height: auto; margin-bottom: 20px; cursor: pointer;">
+        <img id="title-image" src="images/title_image.png" alt="게임 타이틀 이미지"
+            style="max-width: 80%; height: auto; margin-bottom: 20px; cursor: pointer;">
     </div>
 
     <div id="opening-crawl" style="display: none;">
@@ -80,7 +83,7 @@
             <div id="player-hand" class="hand-area">
                 <h2>플레이어</h2>
                 <div class="card-container"></div>
-                 <div class="acquired-cards">
+                <div class="acquired-cards">
                     <h3>획득한 패</h3>
                     <div class="card-container"></div>
                 </div>
@@ -135,9 +138,33 @@
         </div>
     </div>
 
+    <!-- 커스텀 알림 모달 -->
+    <div id="custom-modal" class="modal" style="display: none;">
+        <div class="modal-content custom-modal-content">
+            <h2 id="modal-title">알림</h2>
+            <p id="modal-message">메시지 내용</p>
+            <div class="modal-buttons">
+                <button id="modal-confirm-btn" class="modal-btn confirm">확인</button>
+                <button id="modal-cancel-btn" class="modal-btn cancel" style="display: none;">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 전체 화면 이미지 모달 -->
+    <div id="fullscreen-image-modal" class="modal" style="display: none; background-color: rgba(0,0,0,0.9);">
+        <span class="close-button" id="fullscreen-close-btn"
+            style="color: white; font-size: 40px; top: 20px; right: 30px;">&times;</span>
+        <img class="modal-content" id="fullscreen-image"
+            style="width: auto; height: auto; max-width: 95%; max-height: 95%; background-color: transparent; border: none; box-shadow: none;">
+    </div>
+
+    <!-- 토스트 메시지 컨테이너 -->
+    <div id="toast-container" class="toast-container"></div>
+
     <script type="module" src="js/game_logic.js"></script>
     <script type="module" src="js/turn_manager.js"></script>
     <script type="module" src="js/event_handlers.js"></script>
     <script type="module" src="js/main.js"></script>
 </body>
+
 </html>

@@ -23,7 +23,7 @@ let hasUsedExtraFlipThisTurn = false; // 현재 턴에 추가 뒤집기를 사�
 function startGame(stage) {
     stageSelectionContainer.style.display = 'none';
     gameContainer.style.display = 'block';
-    
+
     Game.setInitialMoney(stage.initialMoney);
     UI.updateMoneyDisplay(Game.playerMoney, Game.computerMoney);
 
@@ -47,20 +47,10 @@ function initGame() {
         return; // 총통으로 게임 즉시 종료
     }
 
-    // 흔들기 확인
-    const shakeMonth = Game.playerHand.find(card => 
-        Game.playerHand.filter(c => c.month === card.month).length >= 3
-    );
-    if (shakeMonth) {
-       const wantsToShake = confirm(`${shakeMonth.month}월 패 3장으로 흔드시겠습니까?`);
-       if (wantsToShake) {
-           Game.incrementPlayerShake();
-           UI.updateStatusMessage(`${shakeMonth.month}월 흔들기! 점수 2배!`);
-       }
-    }
+    // 흔들기 확인 로직 제거 (turn_manager.js의 playerPlay에서 처리)
 
     updateFullBoard();
-    
+
     // 추가 뒤집기 기회 확인 및 안내
     if (Game.extraFlipOwner === 'player' && Game.getExtraFlipsRemaining() > 0) {
         UI.updateStatusMessage(`추가 뒤집기 ${Game.getExtraFlipsRemaining()}회 남음. 패를 내거나 패 더미를 클릭하세요.`);
@@ -153,11 +143,11 @@ export function handleGameEnd() {
                 stageSelectionContainer.style.display = 'block';
             }, stage, selectedImage.imagePath, () => respinShowtime(stage, showtimeImages));
         };
-        
+
         // 쇼타임 룰렛을 다시 돌리는 콜백 함수 정의
         const respinShowtime = (currentStage, currentShowtimeImages) => {
             if (!Game.deductPlayerMoney(SHOWTIME_RESPIN_COST)) {
-                alert(`재화가 부족합니다! (필요: ${SHOWTIME_RESPIN_COST.toLocaleString()}원)`);
+                UI.showModal("알림", `재화가 부족합니다! (필요: ${SHOWTIME_RESPIN_COST.toLocaleString()}원)`);
                 return;
             }
             UI.updateMoneyDisplay(Game.playerMoney, Game.computerMoney);
@@ -170,10 +160,10 @@ export function handleGameEnd() {
     } else if (Game.playerMoney <= 0) {
         // 플레이어 파산 처리
         gameContainer.style.display = 'none';
-        alert("파산했습니다... 게임 오버!");
-        // 여기에 게임 오버 관련 특별 화면이나 로직 추가 가능
-        startScreen.style.display = 'block'; // 예시: 시작 화면으로 돌아가기
-        location.reload(); // 간단하게 새로고침으로 초기화
+        UI.showModal("게임 오버", "파산했습니다... 게임 오버!", () => {
+            startScreen.style.display = 'block';
+            location.reload();
+        });
     } else {
         // 판돈이 남아있으면 다음 라운드 시작
         initGame();

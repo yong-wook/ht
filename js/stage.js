@@ -42,15 +42,19 @@ export function initStageSelection(onStageSelect) {
             `;
             stageElement.addEventListener('click', () => {
                 if (Game.playerMoney >= stage.cost) {
-                    if (confirm(`${stage.name} 스테이지를 해제하시겠습니까?\n비용: ${stage.cost.toLocaleString()}원`)) {
-                        Game.setPlayerMoney(Game.playerMoney - stage.cost);
-                        UI.updateTotalMoneyDisplay(Game.playerMoney);
-                        Game.unlockedStages.push(stage.id);
-                        Game.saveGameData();
-                        initStageSelection(onStageSelect); // UI 갱신
-                    }
+                    UI.showModal(
+                        "스테이지 해제",
+                        `${stage.name} 스테이지를 해제하시겠습니까?\n비용: ${stage.cost.toLocaleString()}원`,
+                        () => { // onConfirm
+                            Game.setPlayerMoney(Game.playerMoney - stage.cost);
+                            UI.updateTotalMoneyDisplay(Game.playerMoney);
+                            Game.unlockedStages.push(stage.id);
+                            Game.saveGameData();
+                            initStageSelection(onStageSelect); // UI 갱신
+                        }
+                    );
                 } else {
-                    alert("돈이 부족합니다.");
+                    UI.showModal("알림", "돈이 부족합니다.");
                 }
             });
         }

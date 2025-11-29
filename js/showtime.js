@@ -1,26 +1,34 @@
 import { SHOWTIME_RESPIN_COST } from './config.js';
+import * as UI from './ui.js'; // UI 모듈 임포트
 
 const showtimeContainer = document.getElementById('showtime-container');
 const showtimeReturnButton = document.getElementById('showtime-return-button');
-const showtimeRespinButton = document.getElementById('showtime-respin-button'); // 추가
+const showtimeRespinButton = document.getElementById('showtime-respin-button');
 const showtimeImage = document.getElementById('showtime-image');
-const showtimeImageWrapper = document.querySelector('.showtime-image-wrapper'); // 추가
-const showtimeRespinCostDisplay = document.getElementById('showtime-respin-cost'); // 추가
+const showtimeImageWrapper = document.querySelector('.showtime-image-wrapper');
+const showtimeRespinCostDisplay = document.getElementById('showtime-respin-cost');
 
 let onShowtimeEndCallback = null;
-let onRespinCallback = null; // 추가
+let onRespinCallback = null;
+
+// 이미지 클릭 시 전체 화면 보기
+showtimeImage.addEventListener('click', () => {
+    if (showtimeImage.src) {
+        UI.showFullscreenImage(showtimeImage.src);
+    }
+});
 
 export function showShowtime(callback, stage, selectedImagePath, respinCallback) {
     onShowtimeEndCallback = callback;
-    onRespinCallback = respinCallback; // 추가
+    onRespinCallback = respinCallback;
     if (selectedImagePath) {
         showtimeImage.src = selectedImagePath;
-        showtimeImageWrapper.style.display = 'flex'; // 이미지 래퍼 표시
+        showtimeImageWrapper.style.display = 'flex';
     } else if (stage && stage.showtimeImage) {
         showtimeImage.src = stage.showtimeImage;
-        showtimeImageWrapper.style.display = 'flex'; // 이미지 래퍼 표시
+        showtimeImageWrapper.style.display = 'flex';
     } else {
-        showtimeImageWrapper.style.display = 'none'; // 이미지 래퍼 숨김
+        showtimeImageWrapper.style.display = 'none';
     }
     showtimeContainer.style.display = 'flex';
 

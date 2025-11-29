@@ -39,9 +39,10 @@ export function checkChongtong() {
                 const moneyWon = Game.calculateMoney(winner, score);
                 UI.updateTotalMoneyDisplay(Game.playerMoney);
                 Game.saveGameData(); // 데이터 저장
-                alert(`${playerName} 총통! ${month}월 패 4장으로 승리! (+${score}점, +${moneyWon.toLocaleString()}원)`);
-                updateFullBoard();
-                handleGameEnd(); // 총통 발생 시 게임 종료 처리
+                UI.showModal("총통!", `${playerName} 총통! ${month}월 패 4장으로 승리! (+${score}점, +${moneyWon.toLocaleString()}원)`, () => {
+                    updateFullBoard();
+                    handleGameEnd(); // 총통 발생 시 게임 종료 처리
+                });
                 return true;
             }
         }
@@ -69,7 +70,7 @@ export function findBestCardToPlay(computerHand, fieldCards, tiedCards) {
             if (ppeokGroup) {
                 // 뻑을 먹으면 얻는 점수 계산 (단순히 뻑 카드들 + 내는 카드 가치 합산)
                 const ppeokValue = ppeokGroup.reduce((sum, c) => sum + getCardValue(c), 0);
-                const currentScore = getCardValue(card) + ppeokValue;
+                const currentScore = getCardValue(card) + ppeokValue + 50; // 뻑 먹기는 매우 중요하므로 가중치 부여
                 if (currentScore > bestPlay.score) {
                     bestPlay = {
                         cardToPlay: card,
@@ -81,8 +82,45 @@ export function findBestCardToPlay(computerHand, fieldCards, tiedCards) {
             }
         }
     }
-    
-    // 2. 일반적인 패 조합 찾기
+
+    // 2. 폭탄 및 흔들기 기회 확인
+    const handCounts = {};
+    computerHand.forEach(c => {
+        handCounts[c.month] = (handCounts[c.month] || 0) + 1;
+    });
+
+    for (const month in handCounts) {
+        if (handCounts[month] === 3) {
+            const cardsInHand = computerHand.filter(c => c.month == month);
+            const matchingFieldCards = fieldCards.filter(c => c.month == month);
+
+            if (matchingFieldCards.length === 1) {
+                // 폭탄 가능
+                const score = 100; // 폭탄은 매우 높은 점수
+                if (score > bestPlay.score) {
+                    bestPlay = {
+                        cardToPlay: cardsInHand[0], // 아무거나 내도 됨
+                        matchingCard: matchingFieldCards[0],
+                        score: score,
+                        reason: `${month}월 폭탄`
+                    };
+                }
+            } else if (matchingFieldCards.length === 0) {
+                // 흔들기 가능
+                const score = 20; // 흔들기도 좋은 점수
+                if (score > bestPlay.score) {
+                    bestPlay = {
+                        cardToPlay: cardsInHand[0],
+                        matchingCard: null,
+                        score: score,
+                        reason: `${month}월 흔들기`
+                    };
+                }
+            }
+        }
+    }
+
+    // 3. 일반적인 패 조합 찾기
     for (const myCard of computerHand) {
         const matchingFieldCards = fieldCards.filter(fieldCard => fieldCard.month === myCard.month);
 
@@ -103,7 +141,7 @@ export function findBestCardToPlay(computerHand, fieldCards, tiedCards) {
         }
     }
 
-    // 3. 먹을 패가 없을 경우, 어떤 패를 버릴지 결정
+    // 4. 먹을 패가 없을 경우, 어떤 패를 버릴지 결정
     if (!bestPlay.cardToPlay) {
         // 가장 가치가 낮은 패를 버림
         let cardToDiscard = computerHand.sort((a, b) => getCardValue(a) - getCardValue(b))[0];

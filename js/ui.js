@@ -134,7 +134,14 @@ export function updateBoard(gameState, playerPlayCallback) {
 
     Object.values(groupedFieldCards).forEach(group => {
         const groupContainer = document.createElement('div');
-        groupContainer.classList.add('field-card-group');
+
+        // 3장인 경우 (초기 3장 깔림 등) 묶어서 표시
+        if (group.length === 3) {
+            groupContainer.classList.add('tied-cards-container');
+        } else {
+            groupContainer.classList.add('field-card-group');
+        }
+
         group.forEach(card => {
             const cardDiv = document.createElement("div");
             cardDiv.classList.add("card");
@@ -150,9 +157,9 @@ export function updateBoard(gameState, playerPlayCallback) {
 
     const deckCard = deckDiv.querySelector('.card');
     if (deck.length > 0) {
-        if(deckCard) deckCard.style.display = 'block';
+        if (deckCard) deckCard.style.display = 'block';
     } else {
-        if(deckCard) deckCard.style.display = 'none';
+        if (deckCard) deckCard.style.display = 'none';
     }
 
     playerScoreSpan.textContent = playerScore;
@@ -182,7 +189,7 @@ export function animateCardMove(startElement, targetElement, callback) {
     // 1. 복제된 카드를 목표 위치로 이동
     requestAnimationFrame(() => {
         // 강제로 reflow 발생시켜 CSS 트랜지션이 적용될 시간을 줌
-        clone.offsetWidth; 
+        clone.offsetWidth;
         clone.style.transform = `translate(${targetRect.left - startRect.left}px, ${targetRect.top - startRect.top}px)`;
     });
 
@@ -267,7 +274,7 @@ export function showResultModal(winner, finalScore, moneyWon, breakdown) {
         else if (item.includes('폭탄')) className += ' bomb';
         else if (item.includes('고')) className += ' go-count';
         else if (item.includes('승리 보너스')) className += ' roulette-bonus';
-        
+
         return `<div class="${className}">${item}</div>`;
     }).join('');
 
@@ -365,4 +372,78 @@ export function showBackgroundGallery(stageId, stageName) {
             modal.style.display = 'none';
         }
     }
+}
+
+// 커스텀 모달 표시
+export function showModal(title, message, onConfirm, onCancel) {
+    const modal = document.getElementById('custom-modal');
+    const titleEl = document.getElementById('modal-title');
+    const messageEl = document.getElementById('modal-message');
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    messageEl.style.whiteSpace = 'pre-line'; // 줄바꿈 지원
+
+    // 확인 버튼 이벤트
+    confirmBtn.onclick = () => {
+        modal.style.display = 'none';
+        if (onConfirm) onConfirm();
+    };
+
+    // 취소 버튼 이벤트 (onCancel 콜백이 있거나, 단순 알림이 아닌 경우 표시)
+    if (onCancel || title === "스테이지 해제" || title === "폭탄" || title === "흔들기") {
+        cancelBtn.style.display = 'inline-block';
+        cancelBtn.onclick = () => {
+            modal.style.display = 'none';
+            if (onCancel) onCancel();
+        };
+    } else {
+        cancelBtn.style.display = 'none';
+    }
+
+    modal.style.display = 'flex';
+}
+
+// 토스트 메시지 표시
+export function showToast(message) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.classList.add('toast');
+    toast.textContent = message;
+
+    container.appendChild(toast);
+
+    // 애니메이션 후 제거
+    setTimeout(() => {
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                toast.remove();
+            }, 300); // fade-out 시간
+        }, 3000); // 3초 동안 표시
+    }, 10);
+}
+
+// 전체 화면 이미지 표시
+export function showFullscreenImage(imageSrc) {
+    const modal = document.getElementById('fullscreen-image-modal');
+    const modalImg = document.getElementById('fullscreen-image');
+    const closeBtn = document.getElementById('fullscreen-close-btn');
+
+    modalImg.src = imageSrc;
+    modal.style.display = 'flex';
+
+    // 닫기 이벤트
+    const close = () => {
+        modal.style.display = 'none';
+        modalImg.src = ''; // 이미지 초기화
+    };
+
+    closeBtn.onclick = close;
+    modal.onclick = (e) => {
+        if (e.target === modal) close();
+    };
 }
