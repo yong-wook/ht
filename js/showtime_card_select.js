@@ -1,4 +1,5 @@
 import { CARDS } from './config.js';
+import { particleSystem } from './effects.js';
 
 const cardSelectContainer = document.getElementById('showtime-card-select-container');
 const cardGrid = document.getElementById('card-grid');
@@ -64,13 +65,22 @@ export function showCardSelection(items, callback) {
 
             scene.classList.add('flipped');
 
-            // 4. 콜백 실행
+            // 4. 시각적 효과 및 콜백 실행
+            // 다른 카드들 어둡게 처리
+            document.querySelectorAll('.card-scene').forEach(c => {
+                if (c !== scene) c.classList.add('dimmed');
+            });
+
+            // 폭죽 효과
+            const rect = scene.getBoundingClientRect();
+            particleSystem.createConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+
             setTimeout(() => {
                 hideCardSelection();
                 if (onCardSelectCallback) {
                     onCardSelectCallback(winningItem);
                 }
-            }, 2000); // 2초 후 콜백 실행
+            }, 2500); // 시간 약간 연장
         });
     }
 

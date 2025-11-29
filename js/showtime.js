@@ -1,5 +1,6 @@
 import { SHOWTIME_RESPIN_COST } from './config.js';
 import * as UI from './ui.js'; // UI 모듈 임포트
+import { particleSystem } from './effects.js';
 
 const showtimeContainer = document.getElementById('showtime-container');
 const showtimeReturnButton = document.getElementById('showtime-return-button');
@@ -34,6 +35,13 @@ export function showShowtime(callback, stage, selectedImagePath, respinCallback)
 
     // 재시도 비용 표시
     showtimeRespinCostDisplay.textContent = `룰렛 재시도 비용: ${SHOWTIME_RESPIN_COST.toLocaleString()}원`;
+
+    // 폭죽 효과 (이미지가 있을 때만)
+    if (showtimeImage.src) {
+        setTimeout(() => {
+            particleSystem.createConfetti(window.innerWidth / 2, window.innerHeight / 2);
+        }, 500); // 이미지 등장 애니메이션과 타이밍 맞춤
+    }
 }
 
 export function hideShowtime() {

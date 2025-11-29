@@ -353,33 +353,81 @@ h3 {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    max-width: 800px;
-    /* 최대 너비 제한 */
-    width: 90vw;
-    /* 뷰포트 너비에 비례 */
-    height: auto;
-    /* 내용에 따라 높이 자동 조절 */
-    max-height: 90vh;
-    /* 뷰포트 높이의 90%를 최대 높이로 설정 */
-    overflow-y: auto;
-    /* 내용이 넘칠 경우 스크롤바 표시 */
-    padding: 30px;
-    background-color: rgba(0, 0, 0, 0.9);
+    /* 최대 너비 제한 완화 및 높이 활용 */
+    max-width: 95vw;
+    width: 95vw;
+    height: 95vh;
+    max-height: 95vh;
+    overflow: hidden;
+    /* 내부 스크롤 대신 flex layout 활용 */
+    padding: 20px;
+
+    /* 동적 배경 */
+    background: linear-gradient(135deg, #1a0033 0%, #000000 50%, #33001a 100%);
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
+
     color: white;
     font-size: 2vw;
-    /* 폰트 크기 조절 (뷰포트 너비에 비례) */
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
     border-radius: 15px;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
-    /* 테두리 그림자 */
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+    border: 1px solid rgba(255, 215, 0, 0.3);
     z-index: 1000;
 }
 
+@keyframes gradientBG {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
 .showtime-container h2 {
-    font-size: 1.5em;
+    font-size: 2em;
     margin-bottom: 10px;
-    animation: sparkle 1.5s infinite alternate;
-    /* 애니메이션 유지 */
+    /* 네온 텍스트 효과 */
+    color: #fff;
+    text-shadow:
+        0 0 5px #fff,
+        0 0 10px #fff,
+        0 0 20px #ff00de,
+        0 0 30px #ff00de,
+        0 0 40px #ff00de,
+        0 0 55px #ff00de,
+        0 0 75px #ff00de;
+    animation: neon-pulse 1.5s infinite alternate;
+}
+
+@keyframes neon-pulse {
+    from {
+        text-shadow:
+            0 0 5px #fff,
+            0 0 10px #fff,
+            0 0 20px #ff00de,
+            0 0 30px #ff00de,
+            0 0 40px #ff00de,
+            0 0 55px #ff00de,
+            0 0 75px #ff00de;
+    }
+
+    to {
+        text-shadow:
+            0 0 2px #fff,
+            0 0 5px #fff,
+            0 0 10px #ff00de,
+            0 0 15px #ff00de,
+            0 0 20px #ff00de,
+            0 0 27px #ff00de,
+            0 0 37px #ff00de;
+    }
 }
 
 .showtime-container p {
@@ -436,21 +484,44 @@ h3 {
 }
 
 /* 쇼타임 이미지 애니메이션 */
+/* 쇼타임 이미지 애니메이션 및 크기 최적화 */
 .showtime-image-wrapper {
     width: 100%;
     flex-grow: 1;
-    /* 남은 공간을 채우도록 설정 */
+    /* 남은 공간 모두 차지 */
+    min-height: 0;
+    /* flex item이 content보다 작아질 수 있게 함 */
     overflow: hidden;
-    /* 스크롤 제거 */
     display: none;
-    /* 초기에는 숨김 */
     justify-content: center;
     align-items: center;
-    /* 중앙 정렬 */
     position: relative;
-    /* 부모 컨테이너에 상대적으로 배치 */
     margin: 10px 0;
-    /* 상하 여백 축소 */
+}
+
+/* God rays 효과 */
+.showtime-image-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 70%);
+    transform: translate(-50%, -50%);
+    animation: rotate-rays 10s linear infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+@keyframes rotate-rays {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
 }
 
 /* 스포트라이트 효과 */
@@ -482,15 +553,18 @@ h3 {
 }
 
 .showtime-image-wrapper img {
-    width: 100%;
-    height: 100%;
-    /* 높이를 컨테이너에 맞춤 */
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
     object-fit: contain;
-    /* 비율 유지하며 전체 표시 */
-    animation: spotlight-reveal 3s ease-in-out forwards;
-    /* 스포트라이트 효과 적용 */
+    animation: spotlight-reveal 1.5s ease-in-out forwards;
+    /* 시간 단축 */
     cursor: pointer;
-    /* 클릭 가능 표시 */
+    z-index: 1;
+    /* God rays 위에 표시 */
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+    /* 이미지 자체 발광 */
 }
 
 @keyframes scanAndZoomOut {
@@ -1235,6 +1309,24 @@ h3 {
 .card-back {
     background-color: #C8242F;
     /* 화투 뒷면 색 (붉은색 계열) */
+    background-image: repeating-linear-gradient(45deg,
+            transparent,
+            transparent 10px,
+            rgba(0, 0, 0, 0.1) 10px,
+            rgba(0, 0, 0, 0.1) 20px);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.card-scene:hover .card-flipper {
+    transform: translateY(-10px) scale(1.05);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+}
+
+.card-scene.dimmed {
+    opacity: 0.3;
+    transform: scale(0.9);
+    transition: all 0.5s;
+    pointer-events: none;
 }
 
 /* 카드 충돌 애니메이션 */
