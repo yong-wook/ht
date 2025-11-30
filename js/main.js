@@ -224,4 +224,13 @@ document.addEventListener('keydown', (event) => {
         Game.setComputerMoney(0); // 컴퓨터 판돈을 0으로 설정
         handleGameEnd(); // 게임 종료 처리 함수 호출
     }
+
+    // 치트키: Shift + M 키를 누르면 돈 10만냥 추가
+    if (event.shiftKey && (event.key === 'M' || event.key === 'm')) {
+        console.log('치트키 발동: 돈 증가');
+        Game.setPlayerMoney(Game.playerMoney + 100000);
+        UI.updateTotalMoneyDisplay(Game.playerMoney);
+        Game.saveGameData();
+        alert('치트키: 100,000냥 획득!');
+    }
 });
