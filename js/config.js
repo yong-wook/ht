@@ -86,6 +86,15 @@ export const STAGES = [
         initialMoney: 200000,
         cost: 2000000,
         unlocked: false
+    },
+    {
+        id: 5,
+        name: "도박의 신",
+        image: "images/stages/stage5/1.jpg",
+        showtimeImage: "images/stages/stage5/8.jpg",
+        initialMoney: 500000,
+        cost: 5000000,
+        unlocked: false
     }
 ];
 
