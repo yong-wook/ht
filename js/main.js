@@ -118,8 +118,8 @@ export function handleGameEnd() {
         const showtimeImages = [];
         for (let i = 1; i <= 12; i++) {
             showtimeImages.push({
-                name: `배경 ${i}`, // 룰렛에 표시될 이름
-                id: i, // 배경 식별자
+                name: `배경 ${i}`,
+                id: i,
                 imagePath: `images/stages/stage${stage.id}/showtime_bg_stage${stage.id}_${String(i).padStart(2, '0')}.jpg`
             });
         }
