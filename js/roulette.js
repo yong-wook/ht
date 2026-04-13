@@ -1,4 +1,5 @@
 import { ROULETTE_ITEMS } from './config.js';
+import { audioManager, SFX } from './audio.js';
 
 const rouletteCanvas = document.getElementById('roulette-canvas');
 const spinButton = document.getElementById('spin-button');
@@ -81,6 +82,7 @@ function spinRoulette() {
     if (isSpinning) return;
     isSpinning = true;
     spinButton.disabled = true;
+    audioManager.playSfx(SFX.ROULETTE);
 
     const totalRotation = 360 * 5 + Math.random() * 360; // 최소 5바퀴 + 랜덤 각도
     const duration = 5000; // 5초

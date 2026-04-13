@@ -51,6 +51,12 @@ export class ParticleSystem {
         // This method might be better handled via CSS classes on the image wrapper
     }
 
+    clear() {
+        this.particles = [];
+        this.animating = false;
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
     animate() {
         this.animating = true;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);

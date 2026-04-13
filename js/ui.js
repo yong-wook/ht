@@ -18,17 +18,26 @@ export const flippedCardContainerDiv = document.getElementById("flipped-card-con
 export const totalMoneySpan = document.getElementById('player-total-money'); // 전체 소지금 표시
 
 // 카드 표시
-export function displayCards(cards, container, isPlayer, playerPlayCallback) {
+export function displayCards(cards, container, isPlayer, playerPlayCallback, fieldCards = []) {
     container.innerHTML = "";
+    const fieldMonths = new Set(fieldCards.map(c => c.month));
     cards.forEach((card) => {
         const cardDiv = document.createElement("div");
         cardDiv.classList.add("card");
-        if (container === computerHandDiv) {
-            cardDiv.style.backgroundColor = 'red'; // 컴퓨터 패는 빨간색
+
+        if (card.type === 'bomb_flip') {
+            cardDiv.classList.add("bomb-flip-card");
+            cardDiv.innerHTML = '<span class="bomb-flip-label">🎴<br>뒤집기</span>';
+        } else if (container === computerHandDiv) {
+            cardDiv.style.backgroundColor = 'red';
         } else {
             cardDiv.style.backgroundImage = `url(images/cards/${card.img.split('/').pop()})`;
         }
+
         cardDiv.dataset.id = card.id;
+        if (isPlayer && card.type !== 'bomb_flip' && fieldMonths.has(card.month)) {
+            cardDiv.classList.add("has-match");
+        }
         if (isPlayer) {
             cardDiv.addEventListener("click", () => playerPlayCallback(card, cardDiv));
         }
@@ -104,9 +113,13 @@ export function displayAcquiredCardsGrouped(cards, container) {
 export function updateBoard(gameState, playerPlayCallback) {
     const { playerHand, computerHand, fieldCards, tiedCards, deck, playerAcquired, computerAcquired, playerScore, computerScore, playerMoney, computerMoney } = gameState;
 
-    playerHand.sort((a, b) => a.month - b.month);
+    playerHand.sort((a, b) => {
+        if (a.type === 'bomb_flip') return 1;
+        if (b.type === 'bomb_flip') return -1;
+        return a.month - b.month;
+    });
 
-    displayCards(playerHand, playerHandDiv, true, playerPlayCallback);
+    displayCards(playerHand, playerHandDiv, true, playerPlayCallback, fieldCards);
     displayCards(computerHand, computerHandDiv, false);
 
     fieldDiv.innerHTML = '';
@@ -332,14 +345,14 @@ export function promptCardSelection(cardsToSelect, callback) {
 }
 
 // 배경 컬렉션 갤러리 표시
-export function showBackgroundGallery(stageId, stageName) {
+export function showBackgroundGallery(stageId, stageName, onReplay = null, replayCost = 0) {
     const modal = document.getElementById('gallery-modal');
     const title = document.getElementById('gallery-title');
     const grid = document.getElementById('gallery-grid');
     const closeButton = modal.querySelector('.close-button');
 
     title.textContent = `${stageName} 배경 컬렉션`;
-    grid.innerHTML = ''; // 그리드 초기화
+    grid.innerHTML = '';
 
     const unlockedBgs = Game.unlockedBackgrounds[stageId] || [];
 
@@ -348,30 +361,36 @@ export function showBackgroundGallery(stageId, stageName) {
         item.classList.add('gallery-item');
 
         if (unlockedBgs.includes(i)) {
+            const imagePath = `images/stages/stage${stageId}/showtime_bg_stage${stageId}_${String(i).padStart(2, '0')}.jpg`;
             const img = document.createElement('img');
-            img.src = `images/stages/stage${stageId}/showtime_bg_stage${stageId}_${String(i).padStart(2, '0')}.jpg`;
+            img.src = imagePath;
             img.alt = `배경 ${i}`;
             item.appendChild(img);
+
+            // 재관람 오버레이
+            if (onReplay) {
+                const overlay = document.createElement('div');
+                overlay.className = 'replay-overlay';
+                overlay.innerHTML = `
+                    <button class="replay-btn">▶ 재관람</button>
+                    <span class="replay-cost">${replayCost > 0 ? replayCost.toLocaleString() + '원' : '무료 🎉'}</span>
+                `;
+                overlay.querySelector('.replay-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    onReplay(imagePath);
+                });
+                item.appendChild(overlay);
+            }
         } else {
             item.classList.add('locked');
-            item.innerHTML = '?';
         }
         grid.appendChild(item);
     }
 
     modal.style.display = 'flex';
 
-    // 닫기 버튼 이벤트
-    closeButton.onclick = () => {
-        modal.style.display = 'none';
-    }
-
-    // 모달 외부 클릭 시 닫기
-    window.onclick = (event) => {
-        if (event.target == modal) {
-            modal.style.display = 'none';
-        }
-    }
+    closeButton.onclick = () => { modal.style.display = 'none'; };
+    window.onclick = (event) => { if (event.target == modal) modal.style.display = 'none'; };
 }
 
 // 커스텀 모달 표시

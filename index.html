@@ -12,6 +12,23 @@
     <div id="player-total-money-container">
         <span>내 소지금: </span><span id="player-total-money">0</span>원
     </div>
+
+    <!-- 오디오 컨트롤 -->
+    <div id="audio-controls" class="audio-controls">
+        <button id="audio-panel-toggle" class="audio-panel-toggle-btn" title="오디오 설정">🔊</button>
+        <div id="audio-panel" class="audio-panel">
+            <div class="audio-row">
+                <button id="bgm-toggle-btn" class="audio-icon-btn" title="배경음악 켜기/끄기">🎵</button>
+                <span class="audio-label">배경음악</span>
+                <input type="range" id="bgm-volume-slider" class="audio-slider" min="0" max="100" value="40">
+            </div>
+            <div class="audio-row">
+                <button id="sfx-toggle-btn" class="audio-icon-btn" title="효과음 켜기/끄기">🔊</button>
+                <span class="audio-label">효과음</span>
+                <input type="range" id="sfx-volume-slider" class="audio-slider" min="0" max="100" value="70">
+            </div>
+        </div>
+    </div>
     <div id="start-screen">
         <img id="title-image" src="images/title_image.png" alt="게임 타이틀 이미지"
             style="max-width: 80%; height: auto; margin-bottom: 20px; cursor: pointer;">
@@ -37,10 +54,31 @@
         </div>
     </div>
 
-    <div id="stage-selection" class="stage-selection" style="display: none;">
-        <h2>스테이지 선택</h2>
-        <div id="stage-container" class="stage-container">
-            <!-- 스테이지 캐릭터들이 여기에 동적으로 추가됩니다. -->
+    <div id="stage-selection" style="display: none;">
+        <div id="stage-scene">
+            <div id="scene-title">천하화투회</div>
+            <div id="stage-chars">
+                <!-- 동적 생성 -->
+            </div>
+            <div id="scene-hint">캐릭터를 클릭하세요</div>
+        </div>
+        <!-- 캐릭터 상호작용 패널 -->
+        <div id="char-panel" style="display:none;">
+            <div id="char-panel-overlay"></div>
+            <div id="char-panel-content">
+                <button id="char-panel-close">✕</button>
+                <div id="char-panel-img-wrap">
+                    <img id="char-panel-img" src="" alt="">
+                </div>
+                <div id="char-panel-info">
+                    <div id="char-panel-stage-label"></div>
+                    <h3 id="char-panel-name"></h3>
+                    <div id="char-panel-hearts"></div>
+                    <div id="char-panel-collection-text"></div>
+                    <p id="char-panel-dialogue"></p>
+                    <div id="char-panel-btns"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -101,9 +139,30 @@
         <button id="spin-button">룰렛 돌리기</button>
     </div>
     <div id="showtime-container" class="showtime-container" style="display: none;">
-        <h2>쇼타임!</h2>
+        <div class="showtime-top-bar">
+            <h2>쇼타임!</h2>
+            <div id="showtime-minigame-ui" style="display:none;">
+                <span id="showtime-timer">⏱ 60</span>
+                <span id="showtime-hit-count">🃏 8쌍 남음</span>
+                <span id="showtime-combo" style="display:none;"></span>
+            </div>
+            <div id="showtime-explore-ui" style="display:none;">
+                <span>🔍 탐색!</span>
+                <span id="showtime-explore-timer">15</span>
+            </div>
+            <div id="showtime-explore-controls" style="display:none;">
+                <button id="explore-zoom-out" title="축소 (-)">−</button>
+                <span id="explore-zoom-level">100%</span>
+                <button id="explore-zoom-in" title="확대 (+/=)">+</button>
+                <button id="explore-zoom-reset" title="원본 크기 (0)">⊙</button>
+                <button id="explore-end-btn" title="탐색 종료 (Enter/ESC)">종료 ✓</button>
+            </div>
+        </div>
         <div class="showtime-image-wrapper">
             <img id="showtime-image" src="" alt="Showtime Character">
+        </div>
+        <div id="showtime-postgame-info" style="display:none;">
+            <p id="showtime-result-text"></p>
         </div>
         <p>상대방의 판돈이 모두 소진되었습니다!</p>
         <p id="showtime-respin-cost" style="font-size: 0.8em; margin-bottom: 10px;"></p>
@@ -120,10 +179,30 @@
         <button id="showtime-spin-button">쇼타임 룰렛 돌리기</button>
     </div>
 
-    <div id="showtime-card-select-container" class="card-select-container" style="display: none;">
-        <h2>운명의 패를 선택하세요</h2>
-        <div id="card-grid" class="card-grid">
-            <!-- 12개의 카드가 여기에 동적으로 추가됩니다. -->
+    <!-- 하이로우 도전 -->
+    <div id="highlow-container" style="display:none;">
+        <div id="highlow-inner">
+            <h2 id="hl-bg-number">배경 No.1 도전!</h2>
+            <p id="hl-desc">연속으로 맞춰야 획득!</p>
+            <div id="hl-streak"></div>
+            <div id="hl-cards">
+                <div class="hl-card-wrap">
+                    <div class="hl-label">현재</div>
+                    <div id="hl-current-card" class="hl-card"></div>
+                    <div id="hl-current-month" class="hl-month"></div>
+                </div>
+                <div id="hl-arrow">?</div>
+                <div class="hl-card-wrap">
+                    <div class="hl-label">다음</div>
+                    <div id="hl-next-card" class="hl-card hl-card-back"></div>
+                    <div id="hl-next-month" class="hl-month"></div>
+                </div>
+            </div>
+            <div id="hl-result"></div>
+            <div id="hl-buttons">
+                <button id="hl-high-btn">▲ 높음</button>
+                <button id="hl-low-btn">▼ 낮음</button>
+            </div>
         </div>
     </div>
 

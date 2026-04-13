@@ -15,6 +15,7 @@ export let playerShakeCount = 0;
 export let computerBombCount = 0;
 export let computerShakeCount = 0;
 export let tiedCards = []; // 뻑으로 묶인 카드 그룹 (2차원 배열)
+export let lastAcquiredBatch = []; // 직전 acquireCards 호출로 획득한 카드 목록 (뻑 판정용)
 export let playerScore = 0;
 export let computerScore = 0;
 export let playerCombos = []; // 플레이어 현재 족보
@@ -25,7 +26,7 @@ export let skipIntro = false; // 인트로 건너뛰기 설정
 // 판돈 관련 변수
 export let playerMoney = 100000; // 플레이어 초기 자금
 export let computerMoney = 0; // 컴퓨터 초기 자금 (스테이지 선택 시 설정)
-const MONEY_PER_POINT = 1000; // 점수당 금액
+export let moneyPerPoint = 1000; // 점수당 금액 (스테이지별로 설정)
 
 // 룰렛 보너스 효과 (다음 라운드 한 판만 적용)
 export let currentRoundBonusMultiplier = 1; // 점수 배율
@@ -36,7 +37,12 @@ export let currentRouletteReward = null; // 현재 룰렛 보상 효과
 
 // 추가 뒤집기 횟수
 export let extraFlipsRemaining = 0;
-export let extraFlipOwner = null; // 추가 뒤집기 기회를 가진 플레이어 ('player', 'computer', or null)
+export let extraFlipOwner = null;
+
+// 폭탄 추가 뒤집기 횟수 (폭탄 1회당 2회 추가)
+export let pendingBombFlips = 0;
+export let bombFlipOwner = null; // 'player' | 'computer' | null
+export let pendingAutoBombFlips = 0; // 플레이어 폭탄 직후 자동 연속 뒤집기 횟수
 
 // 추가 뒤집기 소유자 설정
 export function setExtraFlipOwner(owner) {
@@ -55,8 +61,9 @@ export function setComputerMoney(amount) {
 // --- 함수들 ---
 
 // 판돈 초기화
-export function setInitialMoney(stageInitialMoney) {
+export function setInitialMoney(stageInitialMoney, stageMoneyPerPoint) {
     computerMoney = stageInitialMoney;
+    moneyPerPoint = stageMoneyPerPoint ?? 1000;
 }
 
 // 덱 생성
@@ -96,6 +103,9 @@ export function dealCards(CARDS) {
     currentRoundAddGwang = 0;
     currentRoundWinMultiplier = 1;
     extraFlipsRemaining = 0; // 추가 뒤집기 횟수 초기화
+    pendingBombFlips = 0;
+    bombFlipOwner = null;
+    pendingAutoBombFlips = 0;
 
     for (let i = 0; i < 10; i++) {
         playerHand.push(deck.pop());
@@ -109,6 +119,7 @@ export function dealCards(CARDS) {
 // 카드 획득 처리
 export function acquireCards(turn, ...cardsToAcquire) {
     const allCards = cardsToAcquire.filter(c => c); // null/undefined 카드 제거
+    lastAcquiredBatch = allCards; // 뻑 판정을 위해 이번 배치 기록
 
     if (turn === 'computer') {
         allCards.forEach(card => computerAcquired.push(card));
@@ -247,7 +258,7 @@ export function calculateScore(acquiredCards) {
 
 // 라운드 종료 후 판돈 계산
 export function calculateMoney(winner, finalScore) {
-    const moneyToTransfer = finalScore * MONEY_PER_POINT;
+    const moneyToTransfer = finalScore * moneyPerPoint;
     if (winner === 'player') {
         playerMoney += moneyToTransfer;
         computerMoney -= moneyToTransfer;
@@ -330,6 +341,19 @@ export function decrementExtraFlips() {
     if (extraFlipsRemaining > 0) {
         extraFlipsRemaining--;
     }
+}
+
+export function setPendingBombFlips(n) { pendingBombFlips = n; }
+export function setBombFlipOwner(owner) { bombFlipOwner = owner; }
+export function setPendingAutoBombFlips(n) { pendingAutoBombFlips = n; }
+
+export function consumeBombFlip() {
+    if (pendingBombFlips > 0) {
+        pendingBombFlips--;
+        if (pendingBombFlips === 0) bombFlipOwner = null;
+        return true;
+    }
+    return false;
 }
 
 export function deductPlayerMoney(amount) {

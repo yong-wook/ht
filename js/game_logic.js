@@ -18,30 +18,49 @@ export function getCardValue(card) {
 
 // --- 총통 확인 ---
 export function checkChongtong() {
+    // 손패 총통: 특정 월 4장이 한 플레이어 손에 있을 때
     const checkHand = (hand, playerName) => {
         const monthCounts = {};
         for (const card of hand) {
             monthCounts[card.month] = (monthCounts[card.month] || 0) + 1;
         }
-
         for (const month in monthCounts) {
             if (monthCounts[month] === 4) {
                 updateFullBoard();
-                const score = 5; // 총통 점수
-                let winner = '';
-                if (playerName === '플레이어') {
-                    Game.setPlayerScore(Game.playerScore + score);
-                    winner = 'player';
-                } else {
-                    Game.setComputerScore(Game.computerScore + score);
-                    winner = 'computer';
-                }
+                const score = 5;
+                const winner = playerName === '플레이어' ? 'player' : 'computer';
+                if (winner === 'player') Game.setPlayerScore(Game.playerScore + score);
+                else Game.setComputerScore(Game.computerScore + score);
                 const moneyWon = Game.calculateMoney(winner, score);
                 UI.updateTotalMoneyDisplay(Game.playerMoney);
-                Game.saveGameData(); // 데이터 저장
+                Game.saveGameData();
                 UI.showModal("총통!", `${playerName} 총통! ${month}월 패 4장으로 승리! (+${score}점, +${moneyWon.toLocaleString()}원)`, () => {
                     updateFullBoard();
-                    handleGameEnd(); // 총통 발생 시 게임 종료 처리
+                    handleGameEnd();
+                });
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // 바닥 총통: 같은 월 4장이 모두 바닥에 깔렸을 때 → 플레이어 승
+    const checkField = () => {
+        const monthCounts = {};
+        for (const card of Game.fieldCards) {
+            monthCounts[card.month] = (monthCounts[card.month] || 0) + 1;
+        }
+        for (const month in monthCounts) {
+            if (monthCounts[month] === 4) {
+                updateFullBoard();
+                const score = 5;
+                Game.setPlayerScore(Game.playerScore + score);
+                const moneyWon = Game.calculateMoney('player', score);
+                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                Game.saveGameData();
+                UI.showModal("총통!", `바닥 총통! ${month}월 패 4장 등장 — 플레이어 승리! (+${score}점, +${moneyWon.toLocaleString()}원)`, () => {
+                    updateFullBoard();
+                    handleGameEnd();
                 });
                 return true;
             }
@@ -51,6 +70,7 @@ export function checkChongtong() {
 
     if (checkHand(Game.playerHand, "플레이어")) return true;
     if (checkHand(Game.computerHand, "컴퓨터")) return true;
+    if (checkField()) return true;
     return false;
 }
 

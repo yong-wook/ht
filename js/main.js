@@ -1,14 +1,15 @@
 
-import { CARDS, SHOWTIME_RESPIN_COST } from './config.js';
+import { CARDS, BG_AUCTION_PRICES } from './config.js';
 import * as Game from './game.js';
 import * as UI from './ui.js';
 import * as Stage from './stage.js';
 import * as Roulette from './roulette.js';
 import * as Showtime from './showtime.js';
-import * as ShowtimeCardSelect from './showtime_card_select.js';
+import * as HighLow from './highlow.js';
 import { checkChongtong } from './game_logic.js';
 import { playerPlay } from './turn_manager.js';
 import { initializeEventListeners } from './event_handlers.js';
+import { audioManager, BGM, SFX, initAudioUI } from './audio.js';
 
 const startScreen = document.getElementById('start-screen');
 const titleImage = document.getElementById('title-image'); // titleImage 참조 추가
@@ -24,7 +25,8 @@ function startGame(stage) {
     stageSelectionContainer.style.display = 'none';
     gameContainer.style.display = 'block';
 
-    Game.setInitialMoney(stage.initialMoney);
+    audioManager.playBgm(BGM.GAME);
+    Game.setInitialMoney(stage.initialMoney, stage.moneyPerPoint);
     UI.updateMoneyDisplay(Game.playerMoney, Game.computerMoney);
 
     initGame();
@@ -113,53 +115,85 @@ export function handleGameEnd() {
     // 컴퓨터 판돈이 0 이하가 되면 쇼타임
     if (Game.computerMoney <= 0) {
         gameContainer.style.display = 'none';
-        // 쇼타임 룰렛 아이템 준비
-        const stage = Stage.getSelectedStage();
-        const showtimeImages = [];
+        const stage    = Stage.getSelectedStage();
+        const stageKey = stage.id.toString();
+        if (!Game.unlockedBackgrounds[stageKey]) Game.unlockedBackgrounds[stageKey] = [];
+
+        // 다음 미획득 배경 결정 (순번 고정)
+        const unlockedBgIds = Game.unlockedBackgrounds[stageKey];
+        let nextBgId = null;
         for (let i = 1; i <= 12; i++) {
-            showtimeImages.push({
-                name: `배경 ${i}`,
-                id: i,
-                imagePath: `images/stages/stage${stage.id}/showtime_bg_stage${stage.id}_${String(i).padStart(2, '0')}.jpg`
-            });
+            if (!unlockedBgIds.includes(i)) { nextBgId = i; break; }
         }
 
-        // 해금 로직을 포함한 콜백
-        const onShowtimeCardSelectComplete = (selectedImage) => {
-            // 1. 배경 해금 정보 저장
-            const stageId = stage.id.toString();
-            const bgId = selectedImage.id;
-            if (!Game.unlockedBackgrounds[stageId]) {
-                Game.unlockedBackgrounds[stageId] = [];
-            }
-            if (!Game.unlockedBackgrounds[stageId].includes(bgId)) {
-                Game.unlockedBackgrounds[stageId].push(bgId);
-                Game.saveGameData(); // 변경된 데이터 저장
+        const imagePath = `images/stages/stage${stage.id}/showtime_bg_stage${stage.id}_${String(nextBgId || 1).padStart(2, '0')}.jpg`;
+
+        audioManager.playBgm(BGM.SHOWTIME);
+
+        // 해금 처리 및 쇼타임 진입
+        const goToShowtime = (unlock) => {
+            let collectionBonus = 0;
+            if (unlock && nextBgId && !unlockedBgIds.includes(nextBgId)) {
+                const prevCount = unlockedBgIds.length;
+                unlockedBgIds.push(nextBgId);
+                if (prevCount === 11) {
+                    collectionBonus = stage.collectionBonus || 0;
+                    Game.setPlayerMoney(Game.playerMoney + collectionBonus);
+                    UI.updateTotalMoneyDisplay(Game.playerMoney);
+                }
+                Game.saveGameData();
             }
 
-            // 2. 쇼타임 화면 표시
             Showtime.showShowtime(() => {
                 Showtime.hideShowtime();
-                stageSelectionContainer.style.display = 'block';
-            }, stage, selectedImage.imagePath, () => respinShowtime(stage, showtimeImages));
+                audioManager.playBgm(BGM.LOBBY);
+                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                if (collectionBonus > 0) {
+                    UI.showModal(
+                        '컬렉션 완성!',
+                        `${stage.name}의 모든 배경을 수집했습니다!\n보너스 지급: +${collectionBonus.toLocaleString()}원`,
+                        () => { stageSelectionContainer.style.display = 'block'; }
+                    );
+                } else {
+                    stageSelectionContainer.style.display = 'block';
+                }
+            }, stage, imagePath, null, null, true); // alreadyOwned=true → 탐색 모드
         };
 
-        // 쇼타임 룰렛을 다시 돌리는 콜백 함수 정의
-        const respinShowtime = (currentStage, currentShowtimeImages) => {
-            if (!Game.deductPlayerMoney(SHOWTIME_RESPIN_COST)) {
-                UI.showModal("알림", `재화가 부족합니다! (필요: ${SHOWTIME_RESPIN_COST.toLocaleString()}원)`);
-                return;
-            }
-            UI.updateMoneyDisplay(Game.playerMoney, Game.computerMoney);
-            Showtime.hideShowtime();
-            ShowtimeCardSelect.showCardSelection(currentShowtimeImages, onShowtimeCardSelectComplete);
+        // 하이로우 실패 후 경매 처리
+        const offerAuction = () => {
+            if (!nextBgId) { goToShowtime(false); return; }
+            const price = BG_AUCTION_PRICES[nextBgId - 1];
+            UI.showModal(
+                '도전 실패',
+                `배경 No.${nextBgId}을(를) 획득하지 못했습니다.\n${price.toLocaleString()}원에 구매하시겠습니까?`,
+                () => { // 구매
+                    if (Game.deductPlayerMoney(price)) {
+                        Game.saveGameData();
+                        UI.updateTotalMoneyDisplay(Game.playerMoney);
+                        goToShowtime(true);
+                    } else {
+                        UI.showModal('알림', '돈이 부족합니다.', () => goToShowtime(false));
+                    }
+                },
+                () => goToShowtime(false) // 포기
+            );
         };
 
-        ShowtimeCardSelect.showCardSelection(showtimeImages, onShowtimeCardSelectComplete);
+        if (!nextBgId) {
+            // 12개 전부 수집 완료 — 그냥 쇼타임
+            goToShowtime(false);
+        } else {
+            HighLow.showHighLow(nextBgId, (won) => {
+                if (won) goToShowtime(true);
+                else offerAuction();
+            });
+        }
 
     } else if (Game.playerMoney <= 0) {
         // 플레이어 파산 처리
         gameContainer.style.display = 'none';
+        audioManager.playBgm(BGM.LOBBY);
         UI.showModal("게임 오버", "파산했습니다... 게임 오버!", () => {
             startScreen.style.display = 'block';
             location.reload();
@@ -195,6 +229,7 @@ function initializeApp() {
         showStageSelect();
     } else {
         titleImage.addEventListener('click', () => {
+            audioManager.playBgm(BGM.LOBBY);
             if (document.documentElement.requestFullscreen) {
                 document.documentElement.requestFullscreen().catch(err => console.log(err));
             }
@@ -211,6 +246,7 @@ function initializeApp() {
         });
     }
 
+    initAudioUI();
     initializeEventListeners();
 }
 
@@ -232,5 +268,15 @@ document.addEventListener('keydown', (event) => {
         UI.updateTotalMoneyDisplay(Game.playerMoney);
         Game.saveGameData();
         alert('치트키: 100,000냥 획득!');
+    }
+
+    // 치트키: Shift + C 키를 누르면 컬렉션 초기화
+    if (event.shiftKey && (event.key === 'C' || event.key === 'c')) {
+        console.log('치트키 발동: 컬렉션 초기화');
+        for (const key in Game.unlockedBackgrounds) {
+            Game.unlockedBackgrounds[key] = [];
+        }
+        Game.saveGameData();
+        alert('치트키: 컬렉션 초기화 완료!');
     }
 });
