@@ -15,15 +15,12 @@ const pairsEl                = document.getElementById('showtime-hit-count');
 const postgameInfo           = document.getElementById('showtime-postgame-info');
 const resultTextEl           = document.getElementById('showtime-result-text');
 const showtimeButtons        = document.querySelector('.showtime-buttons');
-const exploreUI              = document.getElementById('showtime-explore-ui');
-const exploreTimerEl         = document.getElementById('showtime-explore-timer');
-const exploreControls        = document.getElementById('showtime-explore-controls');
-const exploreZoomLevelEl     = document.getElementById('explore-zoom-level');
-const exploreZoomInBtn       = document.getElementById('explore-zoom-in');
-const exploreZoomOutBtn      = document.getElementById('explore-zoom-out');
-const exploreZoomResetBtn    = document.getElementById('explore-zoom-reset');
-const exploreEndBtn          = document.getElementById('explore-end-btn');
 const comboEl                = document.getElementById('showtime-combo');
+const showtimeFlash          = document.getElementById('showtime-flash');
+const charQuoteEl            = document.getElementById('showtime-char-quote');
+const charQuoteNameEl        = document.getElementById('showtime-char-quote-name');
+const charQuoteTextEl        = document.getElementById('showtime-char-quote-text');
+const victoryLineEl          = document.getElementById('showtime-victory-line');
 
 // ── 타일 게임 상수 ─────────────────────────────────────────────────────────────
 const COLS          = 4;
@@ -74,31 +71,142 @@ let onShowtimeEndCallback = null;
 let onRespinCallback      = null;
 let onWinCallback         = null; // 타일 클리어 성공 시 배경 해금 처리
 
-// ── 탐색 모드 상태 ─────────────────────────────────────────────────────────────
-let exploreActive   = false;
-let exploreTimerId  = null;
-let exploreTimeLeft = 0;
-let zoomLevel       = 1.0;
-let exploreNatW     = 0;
-let exploreNatH     = 0;
-let isDragging      = false;
-let dragStartX      = 0;
-let dragStartY      = 0;
-let imgLeft         = 0;
-let imgTop          = 0;
-let exploreMinLeft  = 0;
-let exploreMaxLeft  = 0;
-let exploreMinTop   = 0;
-let exploreMaxTop   = 0;
+// ── Ken Burns 자동 애니메이션 상태 ────────────────────────────────────────────
+// background-image 방식 사용: 이미지의 자연 크기 기준으로 px 계산 → 최상단 등
+// 이미지 극단부에도 gap 없이 접근 가능 (transform 방식의 커버리지 제약 없음)
+let kbRafId     = null;
+let kbFrom      = null;
+let kbTo        = null;
+let kbStartTime = 0;
+let kbDuration  = 5000;
+let kbEaseFn    = null;
+let kbLastIdx   = -1;
+let kbQueue     = [];
+let kbImgW      = 0;  // 이미지 자연 너비
+let kbImgH      = 0;  // 이미지 자연 높이
 
-const KEYBOARD_STEP = 8;
-const pressedKeys   = new Set();
-let   exploreRafId  = null;
-const ZOOM_STEP     = 1.25;
-const ZOOM_MIN      = 0.1;
-const ZOOM_MAX      = 8.0;
+// zoom: 배율 (1.0 = cover 꽉 맞춤)
+// fx: 가로 포커스 0.0=완전 좌측  ~ 1.0=완전 우측
+// fy: 세로 포커스 0.0=완전 상단  ~ 1.0=완전 하단
+const KB_ZONES = [
+    { zoom: 1.0,  fx: 0.5,  fy: 0.5  }, // 전체 조망 (cover 전체)
+    { zoom: 1.6,  fx: 0.5,  fy: 0.0  }, // 최상단
+    { zoom: 1.6,  fx: 0.5,  fy: 1.0  }, // 최하단
+    { zoom: 1.6,  fx: 0.0,  fy: 0.5  }, // 최좌측
+    { zoom: 1.6,  fx: 1.0,  fy: 0.5  }, // 최우측
+    { zoom: 2.2,  fx: 0.1,  fy: 0.1  }, // 좌상단 코너
+    { zoom: 2.2,  fx: 0.9,  fy: 0.1  }, // 우상단 코너
+    { zoom: 2.2,  fx: 0.1,  fy: 0.9  }, // 좌하단 코너
+    { zoom: 2.2,  fx: 0.9,  fy: 0.9  }, // 우하단 코너
+    { zoom: 3.0,  fx: 0.25, fy: 0.25 }, // 좌상 클로즈업
+    { zoom: 3.0,  fx: 0.75, fy: 0.75 }, // 우하 클로즈업
+    { zoom: 3.0,  fx: 0.75, fy: 0.25 }, // 우상 클로즈업
+    { zoom: 3.0,  fx: 0.25, fy: 0.75 }, // 좌하 클로즈업
+];
 
-function getExploreTime() { return 30; }
+const KB_EASING_FNS = [
+    t => t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t,
+    t => 1 - Math.pow(1 - t, 3),
+    t => t * t * (3 - 2 * t),
+    t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2,
+];
+
+function nextKbIdx() {
+    if (kbQueue.length === 0) {
+        kbQueue = KB_ZONES.map((_, i) => i);
+        for (let i = kbQueue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [kbQueue[i], kbQueue[j]] = [kbQueue[j], kbQueue[i]];
+        }
+        if (kbLastIdx >= 0 && kbQueue[0] === kbLastIdx) {
+            const swap = 1 + Math.floor(Math.random() * (kbQueue.length - 1));
+            [kbQueue[0], kbQueue[swap]] = [kbQueue[swap], kbQueue[0]];
+        }
+    }
+    kbLastIdx = kbQueue.shift();
+    return kbLastIdx;
+}
+
+function pickKbState() {
+    const z = KB_ZONES[nextKbIdx()];
+    return {
+        zoom: z.zoom + (Math.random() - 0.5) * 0.1,
+        fx: Math.max(0, Math.min(1, z.fx + (Math.random() - 0.5) * 0.08)),
+        fy: Math.max(0, Math.min(1, z.fy + (Math.random() - 0.5) * 0.08)),
+    };
+}
+
+function pickKbDuration(from, to) {
+    const dZoom = Math.abs(to.zoom - from.zoom);
+    const dPos  = Math.sqrt((to.fx - from.fx) ** 2 + (to.fy - from.fy) ** 2);
+    return 2000 + Math.min(dPos * 3000 + dZoom * 1500, 5000);
+}
+
+// background-size/position으로 이미지 탐색 (gap 없음, 극단부 완전 접근 가능)
+function applyKbBg(zoom, fx, fy) {
+    const rect  = showtimeImageWrapper.getBoundingClientRect();
+    const wrapW = rect.width  || showtimeImageWrapper.clientWidth  || 600;
+    const wrapH = rect.height || showtimeImageWrapper.clientHeight || 400;
+    if (!kbImgW || !kbImgH || !wrapW || !wrapH) return;
+
+    const coverScale = Math.max(wrapW / kbImgW, wrapH / kbImgH);
+    const dispW = kbImgW * coverScale * zoom;
+    const dispH = kbImgH * coverScale * zoom;
+    const extraX = Math.max(0, dispW - wrapW);
+    const extraY = Math.max(0, dispH - wrapH);
+
+    showtimeImageWrapper.style.backgroundSize     = `${dispW}px ${dispH}px`;
+    showtimeImageWrapper.style.backgroundPosition = `${-(fx * extraX)}px ${-(fy * extraY)}px`;
+}
+
+function kbFrame() {
+    const t = Math.min((performance.now() - kbStartTime) / kbDuration, 1);
+    const e = kbEaseFn(t);
+    const zoom = kbFrom.zoom + (kbTo.zoom - kbFrom.zoom) * e;
+    const fx   = kbFrom.fx   + (kbTo.fx   - kbFrom.fx)   * e;
+    const fy   = kbFrom.fy   + (kbTo.fy   - kbFrom.fy)   * e;
+    applyKbBg(zoom, fx, fy);
+    if (t >= 1) {
+        kbFrom     = kbTo;
+        kbTo       = pickKbState();
+        kbDuration = pickKbDuration(kbFrom, kbTo);
+        kbEaseFn   = KB_EASING_FNS[Math.floor(Math.random() * KB_EASING_FNS.length)];
+        kbStartTime = performance.now();
+    }
+    kbRafId = requestAnimationFrame(kbFrame);
+}
+
+function startKenBurns() {
+    stopKenBurns();
+    kbImgW = showtimeImage.naturalWidth  || showtimeImageWrapper.clientWidth;
+    kbImgH = showtimeImage.naturalHeight || showtimeImageWrapper.clientHeight;
+    showtimeImageWrapper.style.backgroundImage  = `url('${showtimeImage.src}')`;
+    showtimeImageWrapper.style.backgroundRepeat = 'no-repeat';
+    // CSS animation(fade-in forwards)이 opacity:1로 덮어쓰지 않도록 animation 먼저 제거
+    showtimeImage.style.animation = 'none';
+    showtimeImage.style.opacity   = '0'; // img는 background로 대체, 숨김
+
+    showtimeImageWrapper.classList.add('ken-burns-active');
+    kbQueue   = [];
+    kbLastIdx = -1;
+    kbFrom    = pickKbState();
+    kbTo      = pickKbState();
+    kbDuration  = pickKbDuration(kbFrom, kbTo);
+    kbEaseFn    = KB_EASING_FNS[Math.floor(Math.random() * KB_EASING_FNS.length)];
+    kbStartTime = performance.now();
+    kbRafId = requestAnimationFrame(kbFrame);
+}
+
+function stopKenBurns() {
+    if (kbRafId) { cancelAnimationFrame(kbRafId); kbRafId = null; }
+    showtimeImage.style.animation = '';
+    showtimeImage.style.opacity   = '';
+    showtimeImage.style.transform = '';
+    showtimeImageWrapper.style.backgroundImage    = '';
+    showtimeImageWrapper.style.backgroundSize     = '';
+    showtimeImageWrapper.style.backgroundPosition = '';
+    showtimeImageWrapper.classList.remove('ken-burns-active');
+}
 
 // ── 공개 API ──────────────────────────────────────────────────────────────────
 export function showShowtime(callback, stage, selectedImagePath, respinCallback, onWin, alreadyOwned = false, gameMode = 'tile') {
@@ -114,17 +222,28 @@ export function showShowtime(callback, stage, selectedImagePath, respinCallback,
         showtimeImage.src = stage.showtimeImage;
     }
 
+    // 승리 대사 설정
+    if (victoryLineEl) {
+        if (stage && stage.victoryLines && stage.victoryLines.length > 0) {
+            victoryLineEl.style.display = 'none'; // 처음엔 숨김 — 대사 오버레이로 표시
+        } else {
+            victoryLineEl.style.display = 'none';
+        }
+    }
+
     showtimeRespinCostDisplay.style.display = 'none';
     showtimeRespinButton.style.display = 'none';
 
     showtimeButtons.style.display         = 'none';
     postgameInfo.style.display            = 'none';
-    exploreUI.style.display               = 'none';
-    exploreControls.style.display         = 'none';
     comboEl.style.display                 = 'none';
+    charQuoteEl.style.display             = 'none';
     minigameUI.style.display              = skipToExplore ? 'none' : 'flex';
     showtimeImageWrapper.style.display    = 'flex';
-    showtimeContainer.style.display       = 'flex';
+
+    // 입장 연출
+    showtimeContainer.style.display = 'flex';
+    triggerEntrance(stage);
 
     let starter;
     if (skipToExplore)              starter = startExploreOnly;
@@ -138,18 +257,84 @@ export function showShowtime(callback, stage, selectedImagePath, respinCallback,
     }
 }
 
+// ── 입장 연출 ─────────────────────────────────────────────────────────────────
+function triggerEntrance(stage) {
+    // 컨테이너 진입 애니메이션
+    showtimeContainer.classList.remove('showtime-enter');
+    void showtimeContainer.offsetWidth; // reflow
+    showtimeContainer.classList.add('showtime-enter');
+
+    // 화면 플래시
+    if (showtimeFlash) {
+        showtimeFlash.classList.remove('flash-active');
+        void showtimeFlash.offsetWidth;
+        showtimeFlash.classList.add('flash-active');
+    }
+
+    // 파티클 폭발 (3연타)
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    setTimeout(() => particleSystem.createConfetti(cx, cy, 60), 100);
+    setTimeout(() => {
+        particleSystem.createConfetti(cx * 0.3, cy * 0.5, 40);
+        particleSystem.createConfetti(cx * 1.7, cy * 0.5, 40);
+    }, 400);
+    setTimeout(() => {
+        particleSystem.createConfetti(cx * 0.15, cy, 30);
+        particleSystem.createConfetti(cx * 1.85, cy, 30);
+        particleSystem.createConfetti(cx, cy * 0.2, 30);
+    }, 700);
+
+    // 캐릭터 대사 오버레이 (승리 시)
+    if (stage && stage.victoryLines && stage.victoryLines.length > 0) {
+        const line = stage.victoryLines[Math.floor(Math.random() * stage.victoryLines.length)];
+        setTimeout(() => showCharacterQuote(stage.characterName, line), 350);
+    }
+}
+
+// ── 캐릭터 승리 대사 오버레이 ─────────────────────────────────────────────────
+function showCharacterQuote(name, line) {
+    if (!charQuoteEl) return;
+    charQuoteNameEl.textContent = name;
+    charQuoteTextEl.textContent = '';
+    charQuoteEl.style.display = 'flex';
+    charQuoteEl.classList.remove('quote-exit');
+    charQuoteEl.classList.add('quote-enter');
+
+    // 타자기 효과
+    let i = 0;
+    const typeInterval = setInterval(() => {
+        if (i < line.length) {
+            charQuoteTextEl.textContent += line[i++];
+        } else {
+            clearInterval(typeInterval);
+        }
+    }, 55);
+
+    // 3.5초 후 페이드아웃
+    setTimeout(() => {
+        charQuoteEl.classList.remove('quote-enter');
+        charQuoteEl.classList.add('quote-exit');
+        setTimeout(() => {
+            charQuoteEl.style.display = 'none';
+            charQuoteEl.classList.remove('quote-exit');
+        }, 700);
+    }, 3500);
+}
+
 export function hideShowtime() {
     cleanupGame();
     cleanupPuzzle();
-    cleanupExploreMode();
+    stopKenBurns();
     particleSystem.clear();
     showtimeContainer.style.display = 'none';
 }
 
-// ── 이미 해금된 배경: 타일 없이 바로 탐색 ────────────────────────────────────────
+// ── 이미 해금된 배경: 바로 Ken Burns ─────────────────────────────────────────
 function startExploreOnly() {
     audioManager.playSfx(SFX.SHOWTIME);
-    setTimeout(() => startExploreMode(getExploreTime()), 400);
+    startKenBurns();
+    showtimeButtons.style.display = 'flex';
 }
 
 // ── 타일 매칭 미니게임 ────────────────────────────────────────────────────────
@@ -161,6 +346,7 @@ function startMiniGame() {
     isLocked     = false;
 
     audioManager.playSfx(SFX.SHOWTIME);
+    startKenBurns();
     buildTileGrid();
     updateHUD();
     startTimer();
@@ -308,20 +494,24 @@ function endGame(won) {
             particleSystem.createConfetti(window.innerWidth * 0.75, window.innerHeight * 0.4);
         }, 700);
 
-        // 타일 제거 후 탐색 모드
+        // 타일 제거 후 Ken Burns로 감상
         setTimeout(() => {
             removeTileGrid();
             showtimeImageWrapper.classList.remove('minigame-active');
-            startExploreMode(getExploreTime());
+            resultTextEl.textContent   = '🎉 배경 획득 성공!';
+            postgameInfo.style.display = 'block';
+            showtimeButtons.style.display = 'flex';
         }, 1200);
 
     } else {
-        // 실패: 남은 타일 잠깐 공개 후 실패 결과 표시
+        // 실패: 남은 타일 잠깐 공개 후 결과 표시
         flipAllRemaining();
         setTimeout(() => {
             removeTileGrid();
             showtimeImageWrapper.classList.remove('minigame-active');
-            showLoseResult();
+            resultTextEl.textContent   = '⏰ 시간 초과! 배경을 획득하지 못했습니다.';
+            postgameInfo.style.display = 'block';
+            showtimeButtons.style.display = 'flex';
         }, 1500);
     }
 }
@@ -361,6 +551,7 @@ function startSlidingPuzzle() {
     moveCount  = 0;
 
     audioManager.playSfx(SFX.SHOWTIME);
+    startKenBurns();
     showtimeImageWrapper.classList.add('minigame-active', 'puzzle-mode');
     buildPuzzleGrid();
     updateHUD();
@@ -526,10 +717,11 @@ function endPuzzle(won) {
         setTimeout(() => {
             removePuzzle();
             showtimeImageWrapper.classList.remove('minigame-active', 'puzzle-mode');
-            startExploreMode(30);
+            resultTextEl.textContent   = '🎉 배경 획득 성공!';
+            postgameInfo.style.display = 'block';
+            showtimeButtons.style.display = 'flex';
         }, 1000);
     } else {
-        // 시간 초과: 퍼즐 제거 후 결과 표시
         removePuzzle();
         showtimeImageWrapper.classList.remove('minigame-active', 'puzzle-mode');
         resultTextEl.textContent   = `⏰ 시간 초과! ${moveCount}회 이동했습니다.`;
@@ -552,185 +744,6 @@ function cleanupPuzzle() {
     showtimeImageWrapper.classList.remove('puzzle-mode');
 }
 
-// ── 탐색 모드 ──────────────────────────────────────────────────────────────────
-function startExploreMode(duration) {
-    exploreActive   = true;
-    exploreTimeLeft = duration;
-
-    exploreNatW = showtimeImage.naturalWidth  || showtimeImageWrapper.clientWidth;
-    exploreNatH = showtimeImage.naturalHeight || showtimeImageWrapper.clientHeight;
-
-    zoomLevel = 1.0;
-    applyZoom(zoomLevel, true);
-
-    showtimeImageWrapper.classList.add('explore-mode');
-
-    exploreUI.style.display       = 'flex';
-    exploreControls.style.display = 'flex';
-    updateExploreHUD();
-
-    showtimeImageWrapper.addEventListener('mousedown',  onExploreDragStart);
-    showtimeImageWrapper.addEventListener('touchstart', onExploreDragStart, { passive: true });
-    showtimeImageWrapper.addEventListener('wheel',      onExploreWheel,     { passive: false });
-    document.addEventListener('keydown', onExploreKeyDown);
-    document.addEventListener('keyup',   onExploreKeyUp);
-
-    if (exploreEndBtn) exploreEndBtn.addEventListener('click', endExploreMode);
-
-    exploreTimerId = setInterval(() => {
-        exploreTimeLeft--;
-        updateExploreHUD();
-        if (exploreTimeLeft <= 0) endExploreMode();
-    }, 1000);
-}
-
-function applyZoom(newZoom, centerReset = false) {
-    const wrapperW = showtimeImageWrapper.clientWidth  || 600;
-    const wrapperH = showtimeImageWrapper.clientHeight || 400;
-
-    let imgCenterX = (wrapperW / 2 - imgLeft) / zoomLevel;
-    let imgCenterY = (wrapperH / 2 - imgTop)  / zoomLevel;
-
-    zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
-
-    const scaledW = Math.round(exploreNatW * zoomLevel);
-    const scaledH = Math.round(exploreNatH * zoomLevel);
-
-    exploreMinLeft = scaledW <= wrapperW ? Math.round((wrapperW - scaledW) / 2) : wrapperW - scaledW;
-    exploreMaxLeft = scaledW <= wrapperW ? Math.round((wrapperW - scaledW) / 2) : 0;
-    exploreMinTop  = scaledH <= wrapperH ? Math.round((wrapperH - scaledH) / 2) : wrapperH - scaledH;
-    exploreMaxTop  = scaledH <= wrapperH ? Math.round((wrapperH - scaledH) / 2) : 0;
-
-    if (centerReset) {
-        imgLeft = Math.round((wrapperW - scaledW) / 2);
-        imgTop  = Math.round((wrapperH - scaledH) / 2);
-    } else {
-        imgLeft = Math.round(wrapperW / 2 - imgCenterX * zoomLevel);
-        imgTop  = Math.round(wrapperH / 2 - imgCenterY * zoomLevel);
-    }
-
-    imgLeft = Math.max(exploreMinLeft, Math.min(exploreMaxLeft, imgLeft));
-    imgTop  = Math.max(exploreMinTop,  Math.min(exploreMaxTop,  imgTop));
-
-    showtimeImage.style.position  = 'absolute';
-    showtimeImage.style.width     = scaledW + 'px';
-    showtimeImage.style.height    = scaledH + 'px';
-    showtimeImage.style.objectFit = 'fill';
-    showtimeImage.style.left      = imgLeft + 'px';
-    showtimeImage.style.top       = imgTop  + 'px';
-    showtimeImage.style.maxWidth  = 'none';
-    showtimeImage.style.maxHeight = 'none';
-
-    if (exploreZoomLevelEl) exploreZoomLevelEl.textContent = Math.round(zoomLevel * 100) + '%';
-}
-
-function updateExploreHUD() {
-    exploreTimerEl.textContent = `⏱ ${exploreTimeLeft}`;
-    exploreTimerEl.style.color = exploreTimeLeft <= 5 ? '#ff4444' : '#fff';
-}
-
-function onExploreDragStart(e) {
-    if (!exploreActive) return;
-    isDragging = true;
-    const pos = e.touches ? e.touches[0] : e;
-    dragStartX = pos.clientX - imgLeft;
-    dragStartY = pos.clientY - imgTop;
-    showtimeImage.style.cursor = 'grabbing';
-    showtimeImageWrapper.addEventListener('mousemove',  onExploreDragMove);
-    showtimeImageWrapper.addEventListener('touchmove',  onExploreDragMove, { passive: false });
-    document.addEventListener('mouseup',  onExploreDragEnd);
-    document.addEventListener('touchend', onExploreDragEnd);
-}
-
-function onExploreDragMove(e) {
-    if (!isDragging) return;
-    if (e.cancelable) e.preventDefault();
-    const pos = e.touches ? e.touches[0] : e;
-    imgLeft = Math.max(exploreMinLeft, Math.min(exploreMaxLeft, pos.clientX - dragStartX));
-    imgTop  = Math.max(exploreMinTop,  Math.min(exploreMaxTop,  pos.clientY - dragStartY));
-    showtimeImage.style.left = imgLeft + 'px';
-    showtimeImage.style.top  = imgTop  + 'px';
-}
-
-function onExploreDragEnd() {
-    isDragging = false;
-    showtimeImage.style.cursor = 'grab';
-    showtimeImageWrapper.removeEventListener('mousemove',  onExploreDragMove);
-    showtimeImageWrapper.removeEventListener('touchmove',  onExploreDragMove);
-    document.removeEventListener('mouseup',  onExploreDragEnd);
-    document.removeEventListener('touchend', onExploreDragEnd);
-}
-
-function onExploreWheel(e) {
-    if (!exploreActive) return;
-    e.preventDefault();
-    applyZoom(zoomLevel * (e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP));
-}
-
-const PAN_KEYS  = new Set(['arrowleft','arrowright','arrowup','arrowdown','a','d','w','s']);
-const ZOOM_KEYS = new Set(['+','=','-','0']);
-
-function onExploreKeyDown(e) {
-    if (!exploreActive) return;
-    const key = e.key.toLowerCase();
-    if (PAN_KEYS.has(key)) {
-        e.preventDefault();
-        pressedKeys.add(key);
-        if (!exploreRafId) exploreRafId = requestAnimationFrame(exploreRafLoop);
-        return;
-    }
-    if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); endExploreMode(); return; }
-    if (ZOOM_KEYS.has(e.key)) {
-        e.preventDefault();
-        if (e.key === '+' || e.key === '=') applyZoom(zoomLevel * ZOOM_STEP);
-        else if (e.key === '-')             applyZoom(zoomLevel / ZOOM_STEP);
-        else if (e.key === '0')             applyZoom(1.0, true);
-    }
-}
-
-function onExploreKeyUp(e) { pressedKeys.delete(e.key.toLowerCase()); }
-
-function exploreRafLoop() {
-    if (!exploreActive || pressedKeys.size === 0) { exploreRafId = null; return; }
-    let dx = 0, dy = 0;
-    if (pressedKeys.has('arrowleft')  || pressedKeys.has('a')) dx += KEYBOARD_STEP;
-    if (pressedKeys.has('arrowright') || pressedKeys.has('d')) dx -= KEYBOARD_STEP;
-    if (pressedKeys.has('arrowup')    || pressedKeys.has('w')) dy += KEYBOARD_STEP;
-    if (pressedKeys.has('arrowdown')  || pressedKeys.has('s')) dy -= KEYBOARD_STEP;
-    imgLeft = Math.max(exploreMinLeft, Math.min(exploreMaxLeft, imgLeft + dx));
-    imgTop  = Math.max(exploreMinTop,  Math.min(exploreMaxTop,  imgTop  + dy));
-    showtimeImage.style.left = imgLeft + 'px';
-    showtimeImage.style.top  = imgTop  + 'px';
-    exploreRafId = requestAnimationFrame(exploreRafLoop);
-}
-
-function endExploreMode() {
-    cleanupExploreMode();
-    resultTextEl.textContent   = skipToExplore ? '이미 보유 중인 배경입니다.' : '🎉 배경 획득 성공!';
-    postgameInfo.style.display = 'block';
-    showtimeButtons.style.display = 'flex';
-}
-
-function cleanupExploreMode() {
-    if (!exploreActive) return;
-    exploreActive = false;
-    clearInterval(exploreTimerId);
-    if (exploreEndBtn) exploreEndBtn.removeEventListener('click', endExploreMode);
-    onExploreDragEnd();
-    showtimeImageWrapper.removeEventListener('mousedown',  onExploreDragStart);
-    showtimeImageWrapper.removeEventListener('touchstart', onExploreDragStart);
-    showtimeImageWrapper.removeEventListener('wheel',      onExploreWheel);
-    document.removeEventListener('keydown', onExploreKeyDown);
-    document.removeEventListener('keyup',   onExploreKeyUp);
-    pressedKeys.clear();
-    if (exploreRafId) { cancelAnimationFrame(exploreRafId); exploreRafId = null; }
-    showtimeImageWrapper.classList.remove('explore-mode');
-    ['position','width','height','objectFit','left','top','maxWidth','maxHeight','cursor']
-        .forEach(p => showtimeImage.style[p] = '');
-    exploreUI.style.display       = 'none';
-    exploreControls.style.display = 'none';
-}
-
 // ── 버튼 이벤트 ────────────────────────────────────────────────────────────────
 showtimeReturnButton.addEventListener('click', () => {
     hideShowtime();
@@ -740,7 +753,3 @@ showtimeReturnButton.addEventListener('click', () => {
 showtimeRespinButton.addEventListener('click', () => {
     if (onRespinCallback) onRespinCallback();
 });
-
-exploreZoomInBtn.addEventListener('click',    () => applyZoom(zoomLevel * ZOOM_STEP));
-exploreZoomOutBtn.addEventListener('click',   () => applyZoom(zoomLevel / ZOOM_STEP));
-exploreZoomResetBtn.addEventListener('click', () => applyZoom(1.0, true));

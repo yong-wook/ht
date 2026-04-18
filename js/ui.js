@@ -111,7 +111,7 @@ export function displayAcquiredCardsGrouped(cards, container) {
 
 // 보드 전체 업데이트
 export function updateBoard(gameState, playerPlayCallback) {
-    const { playerHand, computerHand, fieldCards, tiedCards, deck, playerAcquired, computerAcquired, playerScore, computerScore, playerMoney, computerMoney } = gameState;
+    const { playerHand, computerHand, fieldCards, tiedCards, deck, playerAcquired, computerAcquired, playerScore, computerScore, playerMoney, moneyPerPoint } = gameState;
 
     playerHand.sort((a, b) => {
         if (a.type === 'bomb_flip') return 1;
@@ -177,7 +177,7 @@ export function updateBoard(gameState, playerPlayCallback) {
 
     playerScoreSpan.textContent = playerScore;
     computerScoreSpan.textContent = computerScore;
-    updateMoneyDisplay(playerMoney, computerMoney);
+    updateMoneyDisplay(playerMoney, moneyPerPoint ?? 0);
 }
 
 // 카드 이동 및 충돌 애니메이션
@@ -228,10 +228,18 @@ export function animateCardMove(startElement, targetElement, callback) {
     }, { once: true });
 }
 
-// 판돈 표시 업데이트 (게임 보드 내)
-export function updateMoneyDisplay(playerMoney, computerMoney) {
+// 판돈 표시 업데이트 (게임 보드 내) — computerMoney 자리에 moneyPerPoint 표시
+export function updateMoneyDisplay(playerMoney, moneyPerPoint) {
     playerMoneySpan.textContent = playerMoney.toLocaleString();
-    computerMoneySpan.textContent = computerMoney.toLocaleString();
+    computerMoneySpan.textContent = moneyPerPoint.toLocaleString();
+}
+
+// 상대 이름 표시 업데이트
+export function setOpponentNameDisplay(name) {
+    const label = document.getElementById('opponent-name-label');
+    if (label) label.textContent = name;
+    const handLabel = document.getElementById('computer-hand-label');
+    if (handLabel) handLabel.textContent = name;
 }
 
 // 전체 소지금 표시 업데이트 (화면 상단)
@@ -345,13 +353,13 @@ export function promptCardSelection(cardsToSelect, callback) {
 }
 
 // 배경 컬렉션 갤러리 표시
-export function showBackgroundGallery(stageId, stageName, onReplay = null, replayCost = 0) {
+export function showBackgroundGallery(stageId, stageName, onReplay = null, replayCost = 0, selectMode = false) {
     const modal = document.getElementById('gallery-modal');
     const title = document.getElementById('gallery-title');
     const grid = document.getElementById('gallery-grid');
     const closeButton = modal.querySelector('.close-button');
 
-    title.textContent = `${stageName} 배경 컬렉션`;
+    title.textContent = selectMode ? `${stageName} — 감상할 배경을 선택하세요` : `${stageName} 배경 컬렉션`;
     grid.innerHTML = '';
 
     const unlockedBgs = Game.unlockedBackgrounds[stageId] || [];
@@ -367,14 +375,18 @@ export function showBackgroundGallery(stageId, stageName, onReplay = null, repla
             img.alt = `배경 ${i}`;
             item.appendChild(img);
 
-            // 재관람 오버레이
+            // 재관람 / 선택 오버레이
             if (onReplay) {
                 const overlay = document.createElement('div');
                 overlay.className = 'replay-overlay';
-                overlay.innerHTML = `
-                    <button class="replay-btn">▶ 재관람</button>
-                    <span class="replay-cost">${replayCost > 0 ? replayCost.toLocaleString() + '원' : '무료 🎉'}</span>
-                `;
+                if (selectMode) {
+                    overlay.innerHTML = `<button class="replay-btn select-btn">✓ 선택</button>`;
+                } else {
+                    overlay.innerHTML = `
+                        <button class="replay-btn">▶ 재관람</button>
+                        <span class="replay-cost">${replayCost > 0 ? replayCost.toLocaleString() + '원' : '무료 🎉'}</span>
+                    `;
+                }
                 overlay.querySelector('.replay-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
                     onReplay(imagePath);

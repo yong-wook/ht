@@ -116,7 +116,6 @@ function determineWinner() {
     const winningIndex = Math.floor(correctedAngle / arc);
 
     const winningItem = ROULETTE_ITEMS[winningIndex];
-    alert(`축하합니다! ${winningItem.name}에 당첨되셨습니다!`);
     if (onSpinCompleteCallback) {
         onSpinCompleteCallback(winningItem);
     }

@@ -259,7 +259,7 @@ export function playerPlay(selectedCard, selectedCardDiv) {
 
 // --- 컴퓨터 턴 로직 ---
 export function computerTurn() {
-    UI.updateStatusMessage("컴퓨터의 턴입니다...");
+    UI.updateStatusMessage(`${Game.opponentName}의 턴입니다...`);
 
     setTimeout(() => {
         const { cardToPlay, matchingCard, reason } = findBestCardToPlay(Game.computerHand, Game.fieldCards, Game.tiedCards);
@@ -269,14 +269,14 @@ export function computerTurn() {
             // 폭탄 처리
             if (reason.includes('폭탄')) {
                 const bombSet = Game.computerHand.filter(c => c.month === cardToPlay.month);
-                UI.updateStatusMessage(`컴퓨터 ${cardToPlay.month}월 폭탄! 추가 뒤집기 2회`);
+                UI.updateStatusMessage(`${Game.opponentName} ${cardToPlay.month}월 폭탄! 추가 뒤집기 2회`);
                 Game.acquireCards('computer', ...bombSet, matchingCard);
                 Game.setComputerHand(Game.computerHand.filter(c => c.month !== cardToPlay.month));
                 Game.incrementComputerBomb();
                 Game.setPendingBombFlips(2);
                 Game.setBombFlipOwner('computer');
                 if (Game.takePiFromOpponent('computer')) {
-                    UI.updateStatusMessage(UI.statusMessage.textContent + " 컴퓨터가 상대 피 1장 가져감!");
+                    UI.updateStatusMessage(UI.statusMessage.textContent + " ${Game.opponentName}이(가) 상대 피 1장 가져감!");
                 }
                 setTimeout(() => {
                     handleFlippedCard('computer', null);
@@ -286,7 +286,7 @@ export function computerTurn() {
 
             // 흔들기 처리
             if (reason.includes('흔들기')) {
-                UI.updateStatusMessage(`컴퓨터 ${cardToPlay.month}월 흔들기!`);
+                UI.updateStatusMessage(`${Game.opponentName} ${cardToPlay.month}월 흔들기!`);
                 Game.incrementComputerShake();
                 // 흔들기 후에는 그냥 카드를 냄 (일반적인 플레이로 진행)
                 // 하지만 여기서는 흔들기만 하고 카드를 내는 로직은 아래에서 처리됨
@@ -303,7 +303,7 @@ export function computerTurn() {
                     Game.acquireCards('computer', cardToPlay, ...ppeokGroup);
                     Game.setTiedCards(Game.tiedCards.filter(group => group[0].month !== cardToPlay.month));
                     if (Game.takePiFromOpponent('computer')) {
-                        UI.updateStatusMessage(UI.statusMessage.textContent + " 컴퓨터가 상대 피 1장 가져감!");
+                        UI.updateStatusMessage(UI.statusMessage.textContent + " ${Game.opponentName}이(가) 상대 피 1장 가져감!");
                     }
                 }
             } else if (matchingCard) { // 일반 매칭
@@ -313,7 +313,7 @@ export function computerTurn() {
                 if (sameMonthFieldCards.length === 3) {
                     Game.acquireCards('computer', cardToPlay, ...sameMonthFieldCards);
                     if (Game.takePiFromOpponent('computer')) {
-                        UI.updateStatusMessage(UI.statusMessage.textContent + " 컴퓨터가 상대 피 1장 가져감!");
+                        UI.updateStatusMessage(UI.statusMessage.textContent + " ${Game.opponentName}이(가) 상대 피 1장 가져감!");
                     }
                 } else {
                     Game.acquireCards('computer', cardToPlay, matchingCard);
@@ -340,7 +340,7 @@ export function computerTurn() {
 function endTurn(turn) {
     const isSsakSseuri = Game.fieldCards.length === 0;
     if (isSsakSseuri) {
-        UI.updateStatusMessage(`${turn === 'player' ? '플레이어' : '컴퓨터'} 싹쓸이!`);
+        UI.updateStatusMessage(`${turn === 'player' ? '플레이어' : Game.opponentName} 싹쓸이!`);
         audioManager.playSfx(SFX.SSAK);
         if (Game.takePiFromOpponent(turn)) UI.updateStatusMessage(UI.statusMessage.textContent + " 상대 피 1장 가져옴!");
     }
@@ -401,7 +401,7 @@ export function handleExtraFlip(turn) {
 export function handleGo() {
     audioManager.playSfx(SFX.GO);
     Game.incrementPlayerGo();
-    UI.updateStatusMessage(`플레이어 ${Game.playerGoCount}고! 컴퓨터 턴입니다.`);
+    UI.updateStatusMessage(`플레이어 ${Game.playerGoCount}고! ${Game.opponentName}의 턴입니다.`);
     UI.showGoStopButtons(false);
     setTimeout(computerTurn, 1000);
 }
@@ -464,8 +464,12 @@ export function handleStop() {
             audioManager.playSfx(SFX.WIN);
             setTimeout(() => audioManager.playSfx(SFX.COIN), 300);
             UI.showResultModal('player', finalPlayerScore, moneyWon, breakdown);
+            Game.setLastRoundWinner('player');
 
-            if (Game.computerMoney > 0) {
+            // 보드 모드: 룰렛 건너뛰고 바로 결과 처리
+            if (Game.boardEncounterMode) {
+                handleGameEnd();
+            } else if (Game.computerMoney > 0) {
                 Roulette.showRoulette((reward) => {
                     Game.setCurrentRouletteReward(reward);
                     Roulette.hideRoulette();
@@ -499,12 +503,14 @@ export function handleStop() {
             Game.saveGameData();
             audioManager.playSfx(SFX.LOSE);
             UI.showResultModal('computer', finalComputerScore, moneyWon, breakdown);
+            Game.setLastRoundWinner('computer');
             handleGameEnd();
 
         } else {
             UI.showResultModal('draw', 0, 0, ['무승부!']);
             UI.updateTotalMoneyDisplay(Game.playerMoney);
             Game.saveGameData();
+            Game.setLastRoundWinner('draw');
             handleGameEnd();
         }
 

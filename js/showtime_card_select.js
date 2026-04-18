@@ -1,41 +1,42 @@
 import { CARDS } from './config.js';
 import { particleSystem } from './effects.js';
+import { audioManager, SFX } from './audio.js';
 
 const cardSelectContainer = document.getElementById('showtime-card-select-container');
 const cardGrid = document.getElementById('card-grid');
+const collectionStatus = document.getElementById('collection-status');
+const drawButton = document.getElementById('card-draw-button');
 
 let onCardSelectCallback = null;
-let weightedItems = [];
+let currentItems = [];
+let currentUnlockedIds = [];
 
-// 가중치에 따라 아이템(월)을 선택하는 함수
-function getWeightedRandomItem() {
-    const totalWeight = weightedItems.reduce((sum, item) => sum + item.weight, 0);
-    let random = Math.random() * totalWeight;
-
-    for (const item of weightedItems) {
-        random -= item.weight;
-        if (random < 0) {
-            return item.value;
-        }
-    }
-    return weightedItems[weightedItems.length - 1].value; // 혹시 모를 오류 방지
-}
-
-// 카드 선택 화면 초기화 및 표시
-export function showCardSelection(items, callback) {
+export function showCardSelection(items, callback, unlockedBgIds = []) {
     onCardSelectCallback = callback;
-    weightedItems = items.map((item, index) => ({
-        value: item, // item은 {name: '1월', ...} 형태
-        weight: (items.length - index) + 3 // 12월이 더 자주 나오도록 가중치 조정
-    }));
+    currentItems = items;
+    currentUnlockedIds = unlockedBgIds;
 
-    // 1. 결과 미리 결정
-    const winningItem = getWeightedRandomItem();
+    cardGrid.innerHTML = '';
+    drawButton.disabled = false;
+    drawButton.textContent = '뽑기!';
+    drawButton.style.display = 'block';
 
-    cardGrid.innerHTML = ''; // 그리드 초기화
+    // 수집 현황 표시
+    const total = items.length;
+    const collected = unlockedBgIds.length;
+    const remaining = total - collected;
+    collectionStatus.innerHTML =
+        `<span class="cs-collected">${collected} / ${total} 수집</span>` +
+        (remaining > 0
+            ? `<span class="cs-remaining">미획득 ${remaining}장</span>`
+            : `<span class="cs-complete">컬렉션 완성!</span>`);
 
-    // 2. 12개의 카드 생성
-    for (let i = 0; i < 12; i++) {
+    // 카드 12장 생성
+    items.forEach((item) => {
+        const isCollected = unlockedBgIds.includes(item.id);
+        const month = item.id;
+        const rep = CARDS.find(c => c.month === month && (c.type === 'gwang' || c.type === 'ggot'));
+
         const scene = document.createElement('div');
         scene.classList.add('card-scene');
 
@@ -44,50 +45,121 @@ export function showCardSelection(items, callback) {
 
         const front = document.createElement('div');
         front.classList.add('card-face', 'card-front');
+        if (rep) front.style.backgroundImage = `url('${rep.img}')`;
 
         const back = document.createElement('div');
         back.classList.add('card-face', 'card-back');
+
+        if (isCollected) {
+            scene.classList.add('already-collected');
+            const stamp = document.createElement('div');
+            stamp.classList.add('collected-stamp');
+            stamp.textContent = '획득';
+            back.appendChild(stamp);
+        }
 
         flipper.appendChild(front);
         flipper.appendChild(back);
         scene.appendChild(flipper);
         cardGrid.appendChild(scene);
-
-        // 3. 클릭 이벤트 핸들러
-        scene.addEventListener('click', () => {
-            // 이미 뒤집힌 카드는 무시
-            if (document.querySelector('.card-scene.flipped')) return;
-
-            // 어떤 카드를 클릭하든 결정된 결과로 뒤집힘
-            const month = parseInt(winningItem.name.replace('배경 ', ''));
-            const representativeCard = CARDS.find(c => c.month === month && (c.type === 'gwang' || c.type === 'ggot'));
-            front.style.backgroundImage = `url('${representativeCard.img}')`;
-
-            scene.classList.add('flipped');
-
-            // 4. 시각적 효과 및 콜백 실행
-            // 다른 카드들 어둡게 처리
-            document.querySelectorAll('.card-scene').forEach(c => {
-                if (c !== scene) c.classList.add('dimmed');
-            });
-
-            // 폭죽 효과
-            const rect = scene.getBoundingClientRect();
-            particleSystem.createConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
-
-            setTimeout(() => {
-                hideCardSelection();
-                if (onCardSelectCallback) {
-                    onCardSelectCallback(winningItem);
-                }
-            }, 2500); // 시간 약간 연장
-        });
-    }
+    });
 
     cardSelectContainer.style.display = 'flex';
 }
 
-// 카드 선택 화면 숨기기
+drawButton.addEventListener('click', () => {
+    drawButton.disabled = true;
+    startSlotAnimation();
+});
+
+function startSlotAnimation() {
+    const cards = Array.from(cardGrid.querySelectorAll('.card-scene'));
+
+    // 결과 미리 결정: 미획득 중 가장 낮은 번호 우선, 전부 수집 시 랜덤
+    const unlockedSet = new Set(currentUnlockedIds);
+    const firstUncollected = currentItems.findIndex(item => !unlockedSet.has(item.id));
+    const winningIndex = firstUncollected >= 0
+        ? firstUncollected
+        : Math.floor(Math.random() * currentItems.length);
+    const winningItem = currentItems[winningIndex];
+    const isNew = !currentUnlockedIds.includes(winningItem.id);
+
+    // 총 스텝: 3바퀴 + winningIndex 만큼 더 가면 정확히 winningIndex에 착지
+    const totalSteps = cards.length * 3 + winningIndex; // 36 ~ 47
+
+    // 선형 지연 스케줄: 합산이 5700ms → 정착 300ms → 총 6초
+    const TARGET_MS = 5700;
+    const avgDelay  = TARGET_MS / totalSteps;
+    const minDelay  = Math.max(28, Math.round(avgDelay * 0.4));
+    const maxDelay  = Math.round(avgDelay * 2 - minDelay); // (min+max)/2 = avg → 합 = TARGET_MS
+
+    const delays = Array.from({ length: totalSteps }, (_, i) => {
+        const t = i / Math.max(totalSteps - 1, 1);
+        return Math.round(minDelay + (maxDelay - minDelay) * t);
+    });
+
+    // 룰렛 효과음 재생 (BGM 위에 추가)
+    audioManager.playSfx(SFX.ROULETTE);
+
+    let step = 0;
+    function tick() {
+        cards.forEach(c => c.classList.remove('slot-highlight'));
+        cards[step % cards.length].classList.add('slot-highlight');
+
+        step++;
+        if (step >= totalSteps) {
+            setTimeout(() => revealResult(cards, winningIndex, winningItem, isNew), 300);
+            return;
+        }
+        setTimeout(tick, delays[step]);
+    }
+    setTimeout(tick, delays[0]);
+}
+
+function revealResult(cards, winningIndex, item, isNew) {
+    cards.forEach(c => c.classList.remove('slot-highlight'));
+
+    const chosen = cards[winningIndex];
+
+    // 나머지 어둡게
+    cards.forEach((c, i) => {
+        if (i !== winningIndex) c.classList.add('dimmed');
+    });
+
+    // 카드 뒤집기
+    chosen.classList.add('flipped');
+
+    if (isNew) {
+        chosen.classList.add('result-new');
+        const badge = document.createElement('div');
+        badge.className = 'result-badge new-badge';
+        badge.textContent = 'NEW!!';
+        chosen.appendChild(badge);
+
+        const rect = chosen.getBoundingClientRect();
+        particleSystem.createConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        setTimeout(() => particleSystem.createConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2), 400);
+
+        setTimeout(finish, 2800);
+    } else {
+        chosen.classList.add('result-dud');
+        const badge = document.createElement('div');
+        badge.className = 'result-badge dud-badge';
+        badge.textContent = '꽝...';
+        chosen.appendChild(badge);
+
+        cardSelectContainer.classList.add('shake-anim');
+        setTimeout(() => cardSelectContainer.classList.remove('shake-anim'), 600);
+
+        setTimeout(finish, 2200);
+    }
+
+    function finish() {
+        hideCardSelection();
+        if (onCardSelectCallback) onCardSelectCallback(item);
+    }
+}
+
 export function hideCardSelection() {
     cardSelectContainer.style.display = 'none';
 }

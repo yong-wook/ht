@@ -54,13 +54,29 @@
         </div>
     </div>
 
-    <div id="stage-selection" style="display: none;">
-        <div id="stage-scene">
-            <div id="scene-title">천하화투회</div>
-            <div id="stage-chars">
-                <!-- 동적 생성 -->
+    <!-- 보드 게임 메인 화면 -->
+    <div id="board-container" style="display: none;">
+        <div id="board-scene-bg"></div>
+        <div id="board-wrapper">
+            <div id="board-grid">
+                <!-- 타일: JS 동적 생성 -->
+                <div id="board-center">
+                    <div id="board-money-display">💰 0냥</div>
+                    <div id="board-dice-area">
+                        <div class="die" id="die1">⚀</div>
+                        <div class="die" id="die2">⚀</div>
+                    </div>
+                    <div id="board-dice-result"></div>
+                    <button id="board-roll-btn">🎲 굴리기</button>
+                    <div id="board-pos-display"></div>
+                    <div id="board-income-timer">💴 수입까지 60초</div>
+                    <div id="board-level-row">
+                        <div id="board-level-display">⚡ 1,000냥/점 (하수 Lv.1)</div>
+                        <button id="board-levelup-btn">⬆ 레벨업</button>
+                    </div>
+                </div>
             </div>
-            <div id="scene-hint">캐릭터를 클릭하세요</div>
+            <div id="player-token"></div>
         </div>
         <!-- 캐릭터 상호작용 패널 -->
         <div id="char-panel" style="display:none;">
@@ -91,14 +107,14 @@
                 <div>판돈: <span id="player-money">0</span>원</div>
             </div>
             <div>
-                <span>컴퓨터</span>
+                <span id="opponent-name-label">상대</span>
                 <div>점수: <span id="computer-score">0</span></div>
-                <div>판돈: <span id="computer-money">0</span>원</div>
+                <div>점당: <span id="computer-money">0</span>냥</div>
             </div>
         </div>
         <div id="game-board" class="game-board">
             <div id="computer-hand" class="hand-area">
-                <h2>컴퓨터</h2>
+                <h2 id="computer-hand-label">상대</h2>
                 <div class="card-container"></div>
                 <div class="acquired-cards">
                     <h3>획득한 패</h3>
@@ -139,23 +155,21 @@
         <button id="spin-button">룰렛 돌리기</button>
     </div>
     <div id="showtime-container" class="showtime-container" style="display: none;">
+        <!-- 화면 전체 플래시 오버레이 -->
+        <div id="showtime-flash"></div>
+
+        <!-- 캐릭터 승리 대사 오버레이 -->
+        <div id="showtime-char-quote" style="display:none;">
+            <div id="showtime-char-quote-name"></div>
+            <div id="showtime-char-quote-text"></div>
+        </div>
+
         <div class="showtime-top-bar">
-            <h2>쇼타임!</h2>
+            <h2 id="showtime-title">쇼타임!</h2>
             <div id="showtime-minigame-ui" style="display:none;">
                 <span id="showtime-timer">⏱ 60</span>
                 <span id="showtime-hit-count">🃏 8쌍 남음</span>
                 <span id="showtime-combo" style="display:none;"></span>
-            </div>
-            <div id="showtime-explore-ui" style="display:none;">
-                <span>🔍 탐색!</span>
-                <span id="showtime-explore-timer">15</span>
-            </div>
-            <div id="showtime-explore-controls" style="display:none;">
-                <button id="explore-zoom-out" title="축소 (-)">−</button>
-                <span id="explore-zoom-level">100%</span>
-                <button id="explore-zoom-in" title="확대 (+/=)">+</button>
-                <button id="explore-zoom-reset" title="원본 크기 (0)">⊙</button>
-                <button id="explore-end-btn" title="탐색 종료 (Enter/ESC)">종료 ✓</button>
             </div>
         </div>
         <div class="showtime-image-wrapper">
@@ -164,10 +178,10 @@
         <div id="showtime-postgame-info" style="display:none;">
             <p id="showtime-result-text"></p>
         </div>
-        <p>상대방의 판돈이 모두 소진되었습니다!</p>
+        <p id="showtime-victory-line"></p>
         <p id="showtime-respin-cost" style="font-size: 0.8em; margin-bottom: 10px;"></p>
         <div class="showtime-buttons">
-            <button id="showtime-return-button">스테이지 선택으로 돌아가기</button>
+            <button id="showtime-return-button">보드로 돌아가기</button>
             <button id="showtime-respin-button">한번 더 룰렛 돌리기</button>
         </div>
     </div>
@@ -203,6 +217,28 @@
                 <button id="hl-high-btn">▲ 높음</button>
                 <button id="hl-low-btn">▼ 낮음</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 슬라이드 퍼즐 -->
+    <div id="slidepuzzle-container" style="display:none;">
+        <div id="sp-header">
+            <h2 id="sp-title">📚 그림 맞추기</h2>
+            <div id="sp-timer-row">
+                <div id="sp-timer-bar"><div id="sp-timer-fill"></div></div>
+                <span id="sp-timer-text">90</span>
+            </div>
+        </div>
+        <div id="sp-body">
+            <div id="sp-preview-wrap">
+                <div class="sp-preview-label">완성 이미지</div>
+                <div id="sp-preview"></div>
+            </div>
+            <div id="sp-grid"></div>
+        </div>
+        <div id="sp-footer">
+            <span id="sp-moves">이동: 0</span>
+            <button id="sp-giveup-btn">포기</button>
         </div>
     </div>
 

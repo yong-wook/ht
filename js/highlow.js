@@ -29,17 +29,17 @@ function getRequired(id) {
     return 5;
 }
 
-export function showHighLow(targetBgId, callback) {
+export function showHighLow(targetBgId, callback, options = {}) {
     bgId       = targetBgId;
     onComplete = callback;
-    required   = getRequired(bgId);
+    required   = options.required ?? getRequired(bgId);
     streak     = 0;
 
     deck = [...CARDS].sort(() => Math.random() - 0.5);
     currentCard = deck.pop();
 
-    bgNumberEl.textContent = `배경 No.${bgId} 도전!`;
-    descEl.textContent     = `${required}번 연속으로 맞추면 획득!`;
+    bgNumberEl.textContent = options.title || `배경 No.${bgId} 도전!`;
+    descEl.textContent     = options.desc  || `${required}번 연속으로 맞추면 획득!`;
 
     renderStreakDots();
     showCard(currentCardEl, currentMonthEl, currentCard);

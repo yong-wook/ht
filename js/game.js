@@ -35,6 +35,25 @@ export let currentRoundAddGwang = 0; // 추가 광 수
 export let currentRoundWinMultiplier = 1; // 승리 시 점수 배율
 export let currentRouletteReward = null; // 현재 룰렛 보상 효과
 
+// 보드 게임 단판 승부 모드
+export let boardEncounterMode = false;
+export let lastRoundWinner = null; // 'player' | 'computer' | 'draw' | null
+export function setBoardEncounterMode(v) { boardEncounterMode = v; }
+export function setLastRoundWinner(w) { lastRoundWinner = w; }
+
+// 현재 상대 이름 (캐릭터명)
+export let opponentName = '상대';
+export function setOpponentName(name) { opponentName = name; }
+
+// 점당 금액 레벨 (영구 업그레이드) — config.js의 MONEY_PER_POINT_LEVELS와 값 동기화
+const _MPP_VALUES = [0, 1000, 3000, 10000, 30000, 100000]; // index = level
+export let moneyPerPointLevel = 1;
+export function setMoneyPerPointLevel(level) {
+    moneyPerPointLevel = level;
+    if (_MPP_VALUES[level] !== undefined) moneyPerPoint = _MPP_VALUES[level];
+}
+export function setMoneyPerPoint(v) { moneyPerPoint = v; }
+
 // 추가 뒤집기 횟수
 export let extraFlipsRemaining = 0;
 export let extraFlipOwner = null;
@@ -377,8 +396,9 @@ export function saveGameData() {
     const data = {
         playerMoney: playerMoney,
         unlockedStages: unlockedStages,
-        unlockedBackgrounds: unlockedBackgrounds, // 배경 정보 추가
-        skipIntro: skipIntro // 인트로 건너뛰기 설정 저장
+        unlockedBackgrounds: unlockedBackgrounds,
+        skipIntro: skipIntro,
+        moneyPerPointLevel: moneyPerPointLevel
     };
     localStorage.setItem('goStopSaveData', JSON.stringify(data));
 }
@@ -389,13 +409,14 @@ export function loadGameData() {
         const data = JSON.parse(savedData);
         playerMoney = data.playerMoney;
         unlockedStages = data.unlockedStages;
-        unlockedBackgrounds = data.unlockedBackgrounds || {}; // 이전 버전 저장 데이터 호환
-        skipIntro = data.skipIntro || false; // 인트로 건너뛰기 설정 불러오기
+        unlockedBackgrounds = data.unlockedBackgrounds || {};
+        skipIntro = data.skipIntro || false;
+        setMoneyPerPointLevel(data.moneyPerPointLevel || 1);
     } else {
-        // 기본값 설정
         playerMoney = 100000;
         unlockedStages = [1];
         unlockedBackgrounds = {};
         skipIntro = false;
+        setMoneyPerPointLevel(1);
     }
 }
