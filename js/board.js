@@ -6,6 +6,11 @@ import * as HighLow from './highlow.js';
 import * as Roulette from './roulette.js';
 import * as Showtime from './showtime.js';
 import * as SlidePuzzle from './slidepuzzle.js';
+import { audioManager, BGM } from './audio.js';
+import {
+    showGomoku, showFishing, showNumberBaseball, showBreakout,
+    showSudoku, showMinesweeper, showArrowDodge, showPickpocket,
+} from './minigames.js';
 
 // ── 보드 타일 정의 (24칸) ─────────────────────────────────────────────
 export const BOARD_TILES = [
@@ -49,20 +54,61 @@ const TILE_GRID_POS = [
     [1,6],[1,5],[1,4],[1,3],[1,2],             // 좌측
 ];
 
-// 이벤트 효과
-const TILE_EVENTS = {
-    start:   { money:  10000, title: '출발점 통과!',   msg: '한양을 지나갑니다. +10,000냥' },
-    giyeon:  { money:  15000, title: '기연!',          msg: '뜻밖의 인연으로 +15,000냥 획득.' },
-    jujak:   { money:   8000, title: '주막',           msg: '따뜻한 밥 한 끼. 기운이 돌아옵니다. +8,000냥.' },
-    gwana:   { money: -12000, title: '관아',           msg: '관리가 세금을 거둬갑니다. -12,000냥.' },
-    nugang:  { money:  25000, title: '누각',           msg: '경치를 즐기며 영감을 얻다. +25,000냥.' },
-    sanjeok: { money: -25000, title: '산적 출몰!',     msg: '산적 떼에게 습격당했습니다. -25,000냥.' },
-    oncheon: { money:  20000, title: '온천 발견!',     msg: '따뜻한 온천에서 피로를 풀었습니다. +20,000냥.' },
-    bobusang:{ money:  15000, title: '보부상',         msg: '보부상에게서 좋은 물건을 얻었습니다. +15,000냥.' },
+// 타일 호버 툴팁
+const TILE_TOOLTIPS = {
+    start:        '출발점 통과 +10,000냥 보너스',
+    giyeon:       '패 3장 중 선택 — 기연의 인연',
+    jujak:        '밥 한 끼 or 막걸리 내기',
+    gwana:        '납세 순순히 or 뇌물 시도',
+    nugang:       '패 3장 중 선택 — 경치 감상',
+    sanjeok:      '도주 / 결투(강타·속공·방어) / 몸값 선택',
+    oncheon:      '탕 3종 중 선택 — 피로 회복',
+    seodang:      '그림 맞추기 도전 (90초)',
+    gibang:       '공연 감상 (-25,000냥)',
+    dobakjang:    '룰렛 스핀!',
+    bangnanggaek: '보따리 2개 중 선택',
+    bobusang:     '물건 3개 중 선택',
+    jangter:      '화투 하이로우 내기',
+    character:    '클릭 → 고스톱 대결',
 };
 
 const TOTAL_TILES = BOARD_TILES.length;
 const DIE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+
+// ── 컬렉션 완성 수 ─────────────────────────────────────────────────────────
+function getCompletedCollectionCount() {
+    return STAGES.filter(s =>
+        (Game.unlockedBackgrounds[s.id.toString()] || []).length >= 12
+    ).length;
+}
+
+// 미니게임 보상
+const MG_REWARDS = {
+    gomoku:      { win: 50000, lose: 5000  },
+    fishing:     { win: 35000, lose: 8000  },
+    baseball:    { win: 30000, lose: 5000  },
+    breakout:    { win: 40000, lose: 8000  },
+    sudoku:      { win: 30000, lose: 5000  },
+    minesweeper: { win: 35000, lose: 5000  },
+    arrowdodge:  { win: 40000, lose: 8000  },
+    pickpocket:  { win: 35000, lose: 5000  },
+};
+
+function applyMgResult(won, key) {
+    const r = MG_REWARDS[key];
+    const delta = won ? r.win : -r.lose;
+    Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
+    UI.updateTotalMoneyDisplay(Game.playerMoney);
+    Game.saveGameData();
+    updateBoardInfo();
+    UI.showModal(
+        won ? '미니게임 승리! 🎉' : '미니게임 패배',
+        won
+            ? `훌륭합니다! +${r.win.toLocaleString()}냥`
+            : `아쉽네요. -${r.lose.toLocaleString()}냥`,
+        () => { hasRolled = false; }
+    );
+}
 
 // ── 비용·수입 설정 ─────────────────────────────────────────────────────────
 const ROLL_COST          = 10000; // 주사위 굴리기 비용
@@ -76,6 +122,16 @@ let _onGameStart = null;
 
 let countdownTimer = null;
 let incomeSecondsLeft = INCOME_INTERVAL_SEC;
+
+// ── 유틸: 배열 셔플 ────────────────────────────────────────────────────
+function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
 
 // ── 수입 타이머 ────────────────────────────────────────────────────────
 function startIncomeTimer() {
@@ -150,6 +206,14 @@ function renderBoard() {
     const grid = document.getElementById('board-grid');
     grid.querySelectorAll('.board-tile').forEach(e => e.remove());
 
+    // 툴팁 요소 (없으면 생성)
+    let tooltipEl = document.getElementById('board-tile-tooltip');
+    if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.id = 'board-tile-tooltip';
+        document.getElementById('board-wrapper').appendChild(tooltipEl);
+    }
+
     BOARD_TILES.forEach((tile, idx) => {
         const [col, row] = TILE_GRID_POS[idx];
         const el = document.createElement('div');
@@ -196,7 +260,27 @@ function renderBoard() {
             `;
         }
 
+        // 툴팁 데이터
+        const tooltipText = TILE_TOOLTIPS[tile.type] || '';
+        if (tooltipText) el.dataset.tooltip = tooltipText;
+
         grid.appendChild(el);
+    });
+
+    // 호버 툴팁 이벤트 연결
+    grid.querySelectorAll('[data-tooltip]').forEach(tileEl => {
+        tileEl.addEventListener('mouseenter', () => {
+            tooltipEl.textContent = tileEl.dataset.tooltip;
+            tooltipEl.classList.add('visible');
+        });
+        tileEl.addEventListener('mousemove', (e) => {
+            const wRect = document.getElementById('board-wrapper').getBoundingClientRect();
+            tooltipEl.style.left = (e.clientX - wRect.left + 14) + 'px';
+            tooltipEl.style.top  = (e.clientY - wRect.top  - 42) + 'px';
+        });
+        tileEl.addEventListener('mouseleave', () => {
+            tooltipEl.classList.remove('visible');
+        });
     });
 }
 
@@ -277,18 +361,28 @@ function movePlayer(steps) {
             landOnTile(playerPosition);
             return;
         }
+
+        // 떠나는 타일에 궤적 효과
+        const leavingTile = document.querySelector(`.board-tile[data-tile-id="${playerPosition}"]`);
+
         playerPosition = (playerPosition + 1) % TOTAL_TILES;
 
         // 출발점 통과 보너스
         if (playerPosition === 0) {
-            const bonus = TILE_EVENTS.start.money;
-            Game.setPlayerMoney(Game.playerMoney + bonus);
+            Game.setPlayerMoney(Game.playerMoney + 10000);
             UI.updateTotalMoneyDisplay(Game.playerMoney);
             Game.saveGameData();
             UI.showToast('출발점 통과! +10,000냥');
         }
 
         updateToken();
+
+        // 궤적 효과 (tile-active가 제거된 직후 trail 추가)
+        if (leavingTile) {
+            leavingTile.classList.add('tile-trail');
+            setTimeout(() => leavingTile.classList.remove('tile-trail'), 900);
+        }
+
         updateBoardInfo();
         remaining--;
         setTimeout(stepOnce, 280);
@@ -301,6 +395,7 @@ function movePlayer(steps) {
 function landOnTile(pos) {
     const tile = BOARD_TILES[pos];
 
+    // ── 캐릭터 타일 ──────────────────────────────────────────────────
     if (tile.type === 'character') {
         const stage = STAGES.find(s => s.id === tile.stageId);
         Game.setOpponentName(stage.characterName);
@@ -320,8 +415,15 @@ function landOnTile(pos) {
         return;
     }
 
+    // ── 장터: 소매치기잡기 (8명 수집 완료) / 하이로우 ───────────────
     if (tile.type === 'jangter') {
-        // 장터: 하이로우 미니게임 (2번 연속 정답 → +25,000냥, 실패 → -15,000냥)
+        if (getCompletedCollectionCount() >= 8) {
+            UI.showModal('장터 — 소매치기잡기', '장터가 소란스럽습니다! 소매치기를 잡아라!\n50초 안에 10명을 잡으면 +35,000냥, 실패하면 -5,000냥',
+                () => showPickpocket(() => applyMgResult(true, 'pickpocket'), () => applyMgResult(false, 'pickpocket')),
+                () => { hasRolled = false; }
+            );
+            return;
+        }
         UI.showModal('장터', '장터에서 화투 하이로우 내기를 제안받았습니다.\n2번 연속으로 맞추면 25,000냥!\n승부를 받아들이겠습니까?',
             () => {
                 HighLow.showHighLow(1, (won) => {
@@ -347,8 +449,8 @@ function landOnTile(pos) {
         return;
     }
 
+    // ── 도박장: 룰렛 ─────────────────────────────────────────────────
     if (tile.type === 'dobakjang') {
-        // 도박장: 룰렛 스핀
         UI.showModal('도박장', '도박장의 룰렛이 돌아가고 있습니다.\n운을 시험해보시겠습니까?',
             () => {
                 Roulette.showRoulette((item) => {
@@ -369,7 +471,6 @@ function landOnTile(pos) {
                     } else if (eff.type === 'none') {
                         UI.showModal('도박장 결과', '꽝! 오늘은 운이 따르지 않네요.', () => { hasRolled = false; });
                     } else {
-                        // 고스톱 게임 보너스 → 다음 게임에 적용
                         Game.setCurrentRouletteReward(item);
                         Game.saveGameData();
                         UI.showModal('도박장 결과!', `✨ ${item.name} 획득!\n다음 고스톱 승부에서 적용됩니다.`, () => { hasRolled = false; });
@@ -381,12 +482,11 @@ function landOnTile(pos) {
         return;
     }
 
+    // ── 서당: 슬라이드 퍼즐 ──────────────────────────────────────────
     if (tile.type === 'seodang') {
-        // 서당: 슬라이드 퍼즐 미니게임
         const WIN_REWARD  = 30000;
         const CONSOLATION =  5000;
 
-        // 수집된 배경 목록
         const allUnlocked = [];
         STAGES.forEach(s => {
             (Game.unlockedBackgrounds[s.id.toString()] || []).forEach(bgId => {
@@ -395,7 +495,6 @@ function landOnTile(pos) {
         });
 
         if (allUnlocked.length === 0) {
-            // 배경 없음 → 단순 이벤트
             Game.setPlayerMoney(Game.playerMoney + 10000);
             UI.updateTotalMoneyDisplay(Game.playerMoney);
             Game.saveGameData();
@@ -433,10 +532,9 @@ function landOnTile(pos) {
         return;
     }
 
+    // ── 기방: 쇼타임 감상 ────────────────────────────────────────────
     if (tile.type === 'gibang') {
-        // 기방: 입장료 내고 랜덤 쇼타임 감상
         const cost = 25000;
-        // 해금된 모든 배경 수집
         const allUnlocked = [];
         STAGES.forEach(s => {
             (Game.unlockedBackgrounds[s.id.toString()] || []).forEach(bgId => {
@@ -481,26 +579,13 @@ function landOnTile(pos) {
         return;
     }
 
-    if (tile.type === 'bangnanggaek') {
-        // 방랑객: 랜덤 ±20,000냥
-        const lucky = Math.random() < 0.5;
-        const delta = lucky ? 20000 : -20000;
-        Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
-        UI.updateTotalMoneyDisplay(Game.playerMoney);
-        Game.saveGameData();
-        updateBoardInfo();
-        UI.showModal(
-            lucky ? '방랑객의 선물!' : '방랑객의 사기',
-            lucky
-                ? '기이한 방랑객이 비법 비약을 건넵니다. 행운이 깃들었습니다! +20,000냥'
-                : '방랑객인 줄 알았더니 사기꾼이었습니다. -20,000냥',
-            () => { hasRolled = false; }
-        );
-        return;
-    }
-
+    // ── 출발점 정확 착지 ─────────────────────────────────────────────
     if (tile.type === 'start') {
-        // 출발점에 정확히 착지 → 추가 보너스
+        // 모든 미녀 배경 완성 → 최종 엔딩
+        if (STAGES.every(s => (Game.unlockedBackgrounds[s.id.toString()] || []).length >= 12)) {
+            showFinalEnding();
+            return;
+        }
         const extra = 5000;
         Game.setPlayerMoney(Game.playerMoney + extra);
         UI.updateTotalMoneyDisplay(Game.playerMoney);
@@ -509,33 +594,694 @@ function landOnTile(pos) {
         return;
     }
 
-    // 일반 이벤트
-    const ev = TILE_EVENTS[tile.type];
-    if (!ev) { hasRolled = false; return; }
+    // ════════════════════════════════════════════════════════════════
+    // 인터랙티브 이벤트 타일
+    // ════════════════════════════════════════════════════════════════
 
-    const delta = ev.money;
-    if (delta !== 0) {
-        Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
-        UI.updateTotalMoneyDisplay(Game.playerMoney);
-        Game.saveGameData();
+    // ── 기연: 낚시 (2명 수집 완료) / 패 3장 뒤집기 ──────────────────
+    if (tile.type === 'giyeon') {
+        if (getCompletedCollectionCount() >= 2) {
+            UI.showModal('기연 — 낚시', '기연의 인연으로 낚시터에서 도전!\n90초 안에 6마리를 잡으면 +35,000냥, 실패하면 -8,000냥',
+                () => showFishing(() => applyMgResult(true, 'fishing'), () => applyMgResult(false, 'fishing')),
+                () => { hasRolled = false; }
+            );
+            return;
+        }
+        const rewards = shuffle([8000, 15000, 25000]);
+        const icons = ['🌸', '🌺', '🌼'];
+        const cards = rewards.map((r, i) => ({
+            frontIcon: icons[i],
+            frontLabel: `+${r.toLocaleString()}냥`,
+            value: r,
+        }));
+        showCardFlipChoice(
+            '기연',
+            '세 장의 패 중 하나를 골라 인연을 맺으세요.',
+            cards,
+            (card) => {
+                Game.setPlayerMoney(Game.playerMoney + card.value);
+                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                Game.saveGameData();
+                updateBoardInfo();
+                UI.showModal('기연!', `뜻밖의 인연으로 +${card.value.toLocaleString()}냥 획득!`, () => { hasRolled = false; });
+            }
+        );
+        return;
     }
-    updateBoardInfo();
-    UI.showModal(ev.title, ev.msg, () => { hasRolled = false; });
+
+    // ── 누각: 오목 (1명 수집 완료) / 패 3장 뒤집기 ──────────────────
+    if (tile.type === 'nugang') {
+        if (getCompletedCollectionCount() >= 1) {
+            UI.showModal('누각 — 오목', '달밤의 누각에서 오목 고수가 도전해옵니다!\n5목을 완성하면 +50,000냥, 패배하면 -5,000냥',
+                () => showGomoku(() => applyMgResult(true, 'gomoku'), () => applyMgResult(false, 'gomoku')),
+                () => { hasRolled = false; }
+            );
+            return;
+        }
+        const rewards = shuffle([15000, 25000, 40000]);
+        const icons = ['🌟', '⭐', '🌙'];
+        const cards = rewards.map((r, i) => ({
+            frontIcon: icons[i],
+            frontLabel: `+${r.toLocaleString()}냥`,
+            value: r,
+        }));
+        showCardFlipChoice(
+            '누각',
+            '달밤 누각에서 어떤 경치를 감상하시겠습니까?',
+            cards,
+            (card) => {
+                Game.setPlayerMoney(Game.playerMoney + card.value);
+                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                Game.saveGameData();
+                updateBoardInfo();
+                UI.showModal('누각', `경치에서 영감을 얻었습니다. +${card.value.toLocaleString()}냥`, () => { hasRolled = false; });
+            }
+        );
+        return;
+    }
+
+    // ── 보부상: 지뢰찾기 (6명 수집 완료) / 물건 3개 뒤집기 ──────────
+    if (tile.type === 'bobusang') {
+        if (getCompletedCollectionCount() >= 6) {
+            UI.showModal('보부상 — 지뢰찾기', '보부상이 위험한 내기를 겁니다!\n8개의 지뢰를 피해 모두 열면 +35,000냥, 지뢰를 밟으면 -5,000냥',
+                () => showMinesweeper(() => applyMgResult(true, 'minesweeper'), () => applyMgResult(false, 'minesweeper')),
+                () => { hasRolled = false; }
+            );
+            return;
+        }
+        const items = shuffle([
+            { icon: '⚗️', name: '비약',   value: 25000 },
+            { icon: '📜', name: '비법서', value: 12000 },
+            { icon: '🎁', name: '보따리', value: 6000  },
+        ]);
+        const cards = items.map(item => ({
+            frontIcon: item.icon,
+            frontLabel: `${item.name}\n+${item.value.toLocaleString()}냥`,
+            value: item.value,
+            name: item.name,
+        }));
+        showCardFlipChoice(
+            '보부상',
+            '보부상이 세 가지 물건을 내놓았습니다. 하나를 선택하세요.',
+            cards,
+            (card) => {
+                Game.setPlayerMoney(Game.playerMoney + card.value);
+                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                Game.saveGameData();
+                updateBoardInfo();
+                UI.showModal('보부상', `${card.name}을(를) 얻었습니다. +${card.value.toLocaleString()}냥!`, () => { hasRolled = false; });
+            }
+        );
+        return;
+    }
+
+    // ── 방랑객: 화살피하기 (7명 수집 완료) / 보따리 2개 선택 ─────────
+    if (tile.type === 'bangnanggaek') {
+        if (getCompletedCollectionCount() >= 7) {
+            UI.showModal('방랑객 — 화살피하기', '방랑객이 위험한 내기를 겁니다!\n30초 동안 화살을 피하면 +40,000냥, 모두 맞으면 -8,000냥',
+                () => showArrowDodge(() => applyMgResult(true, 'arrowdodge'), () => applyMgResult(false, 'arrowdodge')),
+                () => { hasRolled = false; }
+            );
+            return;
+        }
+        const cards = shuffle([
+            { frontIcon: '🎁', frontLabel: '+20,000냥', value:  20000 },
+            { frontIcon: '😈', frontLabel: '-20,000냥', value: -20000 },
+        ]);
+        showCardFlipChoice(
+            '방랑객',
+            '방랑객이 보따리 두 개를 내밉니다. 하나를 선택하세요.',
+            cards,
+            (card) => {
+                Game.setPlayerMoney(Math.max(0, Game.playerMoney + card.value));
+                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                Game.saveGameData();
+                updateBoardInfo();
+                UI.showModal(
+                    card.value > 0 ? '방랑객의 선물!' : '방랑객의 사기!',
+                    card.value > 0
+                        ? '기이한 비약을 얻었습니다. +20,000냥'
+                        : '방랑객인 줄 알았더니 사기꾼! -20,000냥',
+                    () => { hasRolled = false; }
+                );
+            }
+        );
+        return;
+    }
+
+    // ── 산적: 도주 / 싸움 / 몸값 ────────────────────────────────────
+    if (tile.type === 'sanjeok') {
+        showChoiceModal(
+            '산적 출몰!',
+            '험악한 산적 무리가 앞을 가로막았습니다!',
+            [
+                {
+                    label: '🏃 도주하기',
+                    subtext: '성공(70%): -5,000냥 | 실패(30%): -30,000냥',
+                    callback: () => {
+                        const success = Math.random() < 0.7;
+                        const delta = success ? -5000 : -30000;
+                        Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
+                        UI.updateTotalMoneyDisplay(Game.playerMoney);
+                        Game.saveGameData();
+                        updateBoardInfo();
+                        UI.showModal(
+                            success ? '도주 성공!' : '도주 실패!',
+                            success ? '간신히 도망쳤습니다. -5,000냥' : '붙잡혀 크게 당했습니다! -30,000냥',
+                            () => { hasRolled = false; }
+                        );
+                    },
+                },
+                {
+                    label: '⚔️ 결투하기',
+                    subtext: '강타 / 속공 / 방어 — 먼저 2승 | 승: +15,000냥 | 패: -35,000냥',
+                    danger: true,
+                    callback: () => {
+                        showBanditFight(
+                            () => {
+                                Game.setPlayerMoney(Game.playerMoney + 15000);
+                                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                                Game.saveGameData();
+                                updateBoardInfo();
+                                UI.showModal('결투 승리!', '산적을 물리쳤습니다! +15,000냥', () => { hasRolled = false; });
+                            },
+                            () => {
+                                Game.setPlayerMoney(Math.max(0, Game.playerMoney - 35000));
+                                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                                Game.saveGameData();
+                                updateBoardInfo();
+                                UI.showModal('결투 패배', '산적에게 크게 당했습니다. -35,000냥', () => { hasRolled = false; });
+                            }
+                        );
+                    },
+                },
+                {
+                    label: '💰 몸값 제공',
+                    subtext: '-20,000냥 확정 (안전)',
+                    highlight: true,
+                    callback: () => {
+                        Game.setPlayerMoney(Math.max(0, Game.playerMoney - 20000));
+                        UI.updateTotalMoneyDisplay(Game.playerMoney);
+                        Game.saveGameData();
+                        updateBoardInfo();
+                        UI.showModal('몸값 제공', '산적에게 돈을 건네고 무사히 지났습니다. -20,000냥', () => { hasRolled = false; });
+                    },
+                },
+            ],
+            { icon: '🗡' }
+        );
+        return;
+    }
+
+    // ── 관아: 수도쿠 (5명 수집 완료) / 납세·뇌물 ───────────────────
+    if (tile.type === 'gwana') {
+        if (getCompletedCollectionCount() >= 5) {
+            UI.showModal('관아 — 수도쿠', '관아에서 두뇌 시험을 냅니다!\n9×9 수도쿠를 완성하면 +30,000냥, 포기하면 -5,000냥',
+                () => showSudoku(() => applyMgResult(true, 'sudoku'), () => applyMgResult(false, 'sudoku')),
+                () => { hasRolled = false; }
+            );
+            return;
+        }
+        showChoiceModal(
+            '관아',
+            '관리가 세금을 걷으러 왔습니다. 어떻게 하시겠습니까?',
+            [
+                {
+                    label: '💸 순순히 납부',
+                    subtext: '-12,000냥 확정',
+                    highlight: true,
+                    callback: () => {
+                        Game.setPlayerMoney(Math.max(0, Game.playerMoney - 12000));
+                        UI.updateTotalMoneyDisplay(Game.playerMoney);
+                        Game.saveGameData();
+                        updateBoardInfo();
+                        UI.showModal('납세 완료', '깔끔하게 납세했습니다. -12,000냥', () => { hasRolled = false; });
+                    },
+                },
+                {
+                    label: '🤫 뇌물 시도',
+                    subtext: '성공(50%): 세금 면제 | 발각(50%): -25,000냥',
+                    danger: true,
+                    callback: () => {
+                        const success = Math.random() < 0.5;
+                        if (success) {
+                            UI.showModal('뇌물 성공!', '관리가 눈을 감아줬습니다. 세금 면제!', () => { hasRolled = false; });
+                        } else {
+                            Game.setPlayerMoney(Math.max(0, Game.playerMoney - 25000));
+                            UI.updateTotalMoneyDisplay(Game.playerMoney);
+                            Game.saveGameData();
+                            updateBoardInfo();
+                            UI.showModal('뇌물 발각!', '뇌물이 들통났습니다! 벌금까지 -25,000냥', () => { hasRolled = false; });
+                        }
+                    },
+                },
+            ],
+            { icon: '🏛' }
+        );
+        return;
+    }
+
+    // ── 주막: 숫자야구 (3명 수집 완료) / 쉬어가기·내기 ──────────────
+    if (tile.type === 'jujak') {
+        if (getCompletedCollectionCount() >= 3) {
+            UI.showModal('주막 — 숫자야구', '주막 주인이 세 자리 숫자 내기를 제안합니다!\n7번 안에 맞추면 +30,000냥, 실패하면 -5,000냥',
+                () => showNumberBaseball(() => applyMgResult(true, 'baseball'), () => applyMgResult(false, 'baseball')),
+                () => { hasRolled = false; }
+            );
+            return;
+        }
+        showChoiceModal(
+            '주막',
+            '정겨운 주막이 반겨줍니다.',
+            [
+                {
+                    label: '🍚 밥 한 끼',
+                    subtext: '+8,000냥 확정',
+                    highlight: true,
+                    callback: () => {
+                        Game.setPlayerMoney(Game.playerMoney + 8000);
+                        UI.updateTotalMoneyDisplay(Game.playerMoney);
+                        Game.saveGameData();
+                        updateBoardInfo();
+                        UI.showModal('주막', '따뜻한 밥 한 끼. 기운이 돌아옵니다. +8,000냥', () => { hasRolled = false; });
+                    },
+                },
+                {
+                    label: '🍶 막걸리 내기',
+                    subtext: '승리(60%): +20,000냥 | 패배(40%): -10,000냥',
+                    danger: true,
+                    callback: () => {
+                        const win = Math.random() < 0.6;
+                        const delta = win ? 20000 : -10000;
+                        Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
+                        UI.updateTotalMoneyDisplay(Game.playerMoney);
+                        Game.saveGameData();
+                        updateBoardInfo();
+                        UI.showModal(
+                            win ? '내기 승리!' : '내기 패배!',
+                            win ? '막걸리 내기에서 이겼습니다! +20,000냥' : '내기에서 졌습니다. -10,000냥',
+                            () => { hasRolled = false; }
+                        );
+                    },
+                },
+            ],
+            { icon: '🍶' }
+        );
+        return;
+    }
+
+    // ── 온천: 벽돌깨기 (4명 수집 완료) / 탕 3종 선택 ────────────────
+    if (tile.type === 'oncheon') {
+        if (getCompletedCollectionCount() >= 4) {
+            UI.showModal('온천 — 벽돌깨기', '온천 연회에서 벽돌깨기 대결!\n모든 벽돌을 깨면 +40,000냥, 실패하면 -8,000냥',
+                () => showBreakout(() => applyMgResult(true, 'breakout'), () => applyMgResult(false, 'breakout')),
+                () => { hasRolled = false; }
+            );
+            return;
+        }
+        showChoiceModal(
+            '온천 발견!',
+            '세 가지 탕이 마련되어 있습니다. 어느 탕을 선택하시겠습니까?',
+            [
+                {
+                    label: '💧 기본탕',
+                    subtext: '+15,000냥 확정',
+                    highlight: true,
+                    callback: () => {
+                        Game.setPlayerMoney(Game.playerMoney + 15000);
+                        UI.updateTotalMoneyDisplay(Game.playerMoney);
+                        Game.saveGameData();
+                        updateBoardInfo();
+                        UI.showModal('기본탕', '기본탕에서 피로를 풀었습니다. +15,000냥', () => { hasRolled = false; });
+                    },
+                },
+                {
+                    label: '🌡️ 열탕',
+                    subtext: '효험(70%): +30,000냥 | 과열(30%): +5,000냥',
+                    callback: () => {
+                        const big = Math.random() < 0.7;
+                        const reward = big ? 30000 : 5000;
+                        Game.setPlayerMoney(Game.playerMoney + reward);
+                        UI.updateTotalMoneyDisplay(Game.playerMoney);
+                        Game.saveGameData();
+                        updateBoardInfo();
+                        UI.showModal(
+                            big ? '열탕 대성공!' : '열탕이 너무 뜨거워!',
+                            big ? '충분히 몸을 녹였습니다. +30,000냥' : '너무 뜨거워 금방 나왔습니다. +5,000냥',
+                            () => { hasRolled = false; }
+                        );
+                    },
+                },
+                {
+                    label: '✨ 약탕',
+                    subtext: '신효(50%): +40,000냥 | 효과 미미(50%): +10,000냥',
+                    danger: true,
+                    callback: () => {
+                        const miracle = Math.random() < 0.5;
+                        const reward = miracle ? 40000 : 10000;
+                        Game.setPlayerMoney(Game.playerMoney + reward);
+                        UI.updateTotalMoneyDisplay(Game.playerMoney);
+                        Game.saveGameData();
+                        updateBoardInfo();
+                        UI.showModal(
+                            miracle ? '약탕 신효!' : '약탕 효과 미미',
+                            miracle ? '비밀 약재의 효험이 대단합니다! +40,000냥' : '약효가 약했네요. +10,000냥',
+                            () => { hasRolled = false; }
+                        );
+                    },
+                },
+            ],
+            { icon: '♨' }
+        );
+        return;
+    }
+
+    // fallback (알 수 없는 타일 타입)
+    hasRolled = false;
 }
 
-// ── 화투 베팅 (장터 / 도박장 공용) ──────────────────────────────────
-function jangterBet(bet = 20000, winChance = 0.5) {
-    const win = Math.random() < winChance;
-    const delta = win ? bet : -bet;
-    Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
-    UI.updateTotalMoneyDisplay(Game.playerMoney);
-    Game.saveGameData();
-    updateBoardInfo();
-    UI.showModal(
-        win ? '승리!' : '패배!',
-        win ? `화투에서 이겼습니다! +${bet.toLocaleString()}냥` : `화투에서 졌습니다. -${bet.toLocaleString()}냥`,
-        () => { hasRolled = false; }
-    );
+// ══════════════════════════════════════════════════════════════════════
+// 인터랙티브 모달 헬퍼
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * 다중 선택지 모달
+ * choices: [{ label, subtext?, callback, danger?, highlight? }]
+ * opts: { icon? }
+ */
+function showChoiceModal(title, desc, choices, opts = {}) {
+    const overlay = document.createElement('div');
+    overlay.className = 'bm-overlay';
+
+    const box = document.createElement('div');
+    box.className = 'bm-box';
+
+    if (opts.icon) {
+        const iconEl = document.createElement('div');
+        iconEl.className = 'bm-event-icon';
+        iconEl.textContent = opts.icon;
+        box.appendChild(iconEl);
+    }
+
+    const h = document.createElement('h3');
+    h.className = 'bm-title';
+    h.textContent = title;
+    box.appendChild(h);
+
+    const p = document.createElement('p');
+    p.className = 'bm-desc';
+    p.textContent = desc;
+    box.appendChild(p);
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'bm-btns';
+    choices.forEach(c => {
+        const btn = document.createElement('button');
+        let cls = 'bm-btn';
+        if (c.danger)     cls += ' bm-btn-danger';
+        if (c.highlight)  cls += ' bm-btn-highlight';
+        btn.className = cls;
+        btn.innerHTML = `<span class="bm-btn-main">${c.label}</span>${c.subtext ? `<span class="bm-btn-sub">${c.subtext}</span>` : ''}`;
+        btn.addEventListener('click', () => {
+            overlay.remove();
+            c.callback();
+        });
+        btnRow.appendChild(btn);
+    });
+    box.appendChild(btnRow);
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('bm-visible'));
+}
+
+/**
+ * 카드 뒤집기 선택 모달
+ * cards: [{ frontIcon, frontLabel, value, ...extra }]
+ * onPick: (card) => void
+ */
+function showCardFlipChoice(title, desc, cards, onPick) {
+    const overlay = document.createElement('div');
+    overlay.className = 'bm-overlay';
+
+    const box = document.createElement('div');
+    box.className = 'bm-box bm-card-box';
+
+    const h = document.createElement('h3');
+    h.className = 'bm-title';
+    h.textContent = title;
+    box.appendChild(h);
+
+    const p = document.createElement('p');
+    p.className = 'bm-desc';
+    p.textContent = desc;
+    box.appendChild(p);
+
+    const cardRow = document.createElement('div');
+    cardRow.className = 'bm-card-row';
+
+    let picked = false;
+    const cardEls = [];
+
+    cards.forEach((card, i) => {
+        const cardEl = document.createElement('div');
+        cardEl.className = 'bm-card';
+
+        const inner = document.createElement('div');
+        inner.className = 'bm-card-inner';
+
+        const back = document.createElement('div');
+        back.className = 'bm-card-back';
+        back.innerHTML = '<span class="bm-back-glyph">花</span>';
+
+        const front = document.createElement('div');
+        front.className = 'bm-card-front';
+        front.innerHTML = `<span class="bm-card-icon">${card.frontIcon}</span><span class="bm-card-label">${card.frontLabel.replace(/\n/g, '<br>')}</span>`;
+
+        inner.appendChild(back);
+        inner.appendChild(front);
+        cardEl.appendChild(inner);
+        cardEls.push(cardEl);
+
+        cardEl.addEventListener('click', () => {
+            if (picked) return;
+            picked = true;
+
+            // 선택된 카드 뒤집기
+            cardEl.classList.add('bm-card-flipped');
+
+            setTimeout(() => {
+                // 나머지 카드도 뒤집어 공개 (흐리게)
+                cardEls.forEach((el, j) => {
+                    if (j !== i) el.classList.add('bm-card-flipped', 'bm-card-unchosen');
+                });
+                // 잠시 후 닫고 콜백
+                setTimeout(() => {
+                    overlay.remove();
+                    onPick(card);
+                }, 1000);
+            }, 550);
+        });
+
+        cardRow.appendChild(cardEl);
+    });
+
+    box.appendChild(cardRow);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('bm-visible'));
+}
+
+// ── 산적 결투 미니게임 ─────────────────────────────────────────────────
+/**
+ * 강타 > 방어 > 속공 > 강타 (가위바위보)
+ * 먼저 2승 — onWin / onLose 콜백
+ */
+function showBanditFight(onWin, onLose) {
+    const MOVES = [
+        { id: 'strong', label: '강타', icon: '⚔️', beats: 'defend'  },
+        { id: 'quick',  label: '속공', icon: '🥷', beats: 'strong' },
+        { id: 'defend', label: '방어', icon: '🛡️', beats: 'quick'  },
+    ];
+    const WIN_NEEDED = 2;
+
+    let playerWins = 0;
+    let banditWins = 0;
+    let attempt = 1;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'bm-overlay';
+    overlay.innerHTML = `
+        <div class="bm-box bm-fight-box">
+            <div class="bm-fight-header">
+                <div class="bm-fight-banner">⚔️ 산적과의 결투!</div>
+                <div class="bm-fight-rule">강타 &gt; 방어 &gt; 속공 &gt; 강타 &nbsp;|&nbsp; 먼저 2승 승리</div>
+            </div>
+            <div class="bm-fight-score-row">
+                <div class="fight-side">
+                    <div class="fight-side-name">나</div>
+                    <div class="fight-pips" id="fight-player-pips"></div>
+                </div>
+                <div class="fight-round-badge" id="fight-round-label">라운드 1</div>
+                <div class="fight-side">
+                    <div class="fight-side-name">산적</div>
+                    <div class="fight-pips" id="fight-bandit-pips"></div>
+                </div>
+            </div>
+            <div class="bm-fight-arena">
+                <div class="fight-slot" id="fight-player-slot">
+                    <div class="fight-slot-label">나의 기술</div>
+                    <div class="fight-slot-content" id="fight-player-content">
+                        <span class="fight-slot-q">?</span>
+                    </div>
+                </div>
+                <div class="fight-arena-vs">VS</div>
+                <div class="fight-slot" id="fight-bandit-slot">
+                    <div class="fight-slot-label">산적 기술</div>
+                    <div class="fight-slot-content" id="fight-bandit-content">
+                        <span class="fight-slot-q">?</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bm-fight-result" id="fight-result">기술을 선택하세요!</div>
+            <div class="bm-fight-btns" id="fight-btns">
+                <button class="fight-move-btn" data-move="strong">
+                    <span class="fmb-icon">⚔️</span>
+                    <span class="fmb-name">강타</span>
+                    <span class="fmb-hint">방어에 강함</span>
+                </button>
+                <button class="fight-move-btn" data-move="quick">
+                    <span class="fmb-icon">🥷</span>
+                    <span class="fmb-name">속공</span>
+                    <span class="fmb-hint">강타에 강함</span>
+                </button>
+                <button class="fight-move-btn" data-move="defend">
+                    <span class="fmb-icon">🛡️</span>
+                    <span class="fmb-name">방어</span>
+                    <span class="fmb-hint">속공을 막음</span>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('bm-visible'));
+
+    const playerPipsEl  = overlay.querySelector('#fight-player-pips');
+    const banditPipsEl  = overlay.querySelector('#fight-bandit-pips');
+    const roundLabelEl  = overlay.querySelector('#fight-round-label');
+    const playerSlotEl  = overlay.querySelector('#fight-player-slot');
+    const banditSlotEl  = overlay.querySelector('#fight-bandit-slot');
+    const playerContent = overlay.querySelector('#fight-player-content');
+    const banditContent = overlay.querySelector('#fight-bandit-content');
+    const resultEl      = overlay.querySelector('#fight-result');
+    const btnsEl        = overlay.querySelector('#fight-btns');
+
+    function renderPips() {
+        [playerPipsEl, banditPipsEl].forEach((el, i) => {
+            const wins = i === 0 ? playerWins : banditWins;
+            el.innerHTML = '';
+            for (let j = 0; j < WIN_NEEDED; j++) {
+                const pip = document.createElement('span');
+                pip.className = 'fight-pip' + (j < wins ? ' won' : '');
+                el.appendChild(pip);
+            }
+        });
+    }
+
+    function setMoveContent(contentEl, move) {
+        contentEl.innerHTML = `<span class="fight-slot-icon">${move.icon}</span><span class="fight-slot-move-name">${move.label}</span>`;
+        contentEl.classList.remove('reveal-anim');
+        // reflow
+        void contentEl.offsetWidth;
+        contentEl.classList.add('reveal-anim');
+    }
+
+    function resetArena() {
+        playerContent.innerHTML = '<span class="fight-slot-q">?</span>';
+        banditContent.innerHTML = '<span class="fight-slot-q">?</span>';
+        playerContent.classList.remove('reveal-anim');
+        banditContent.classList.remove('reveal-anim');
+        playerSlotEl.classList.remove('slot-win', 'slot-lose', 'slot-tie');
+        banditSlotEl.classList.remove('slot-win', 'slot-lose', 'slot-tie');
+    }
+
+    function setButtonsDisabled(v) {
+        btnsEl.querySelectorAll('.fight-move-btn').forEach(b => { b.disabled = v; });
+    }
+
+    renderPips();
+
+    function pickMove(playerMoveId) {
+        setButtonsDisabled(true);
+
+        const playerMove = MOVES.find(m => m.id === playerMoveId);
+        const banditMove = MOVES[Math.floor(Math.random() * MOVES.length)];
+
+        setMoveContent(playerContent, playerMove);
+
+        // 산적 기술 공개 — 약간의 지연으로 긴장감
+        setTimeout(() => {
+            setMoveContent(banditContent, banditMove);
+
+            setTimeout(() => {
+                let outcome;
+                if (playerMove.id === banditMove.id) {
+                    outcome = 'tie';
+                } else if (playerMove.beats === banditMove.id) {
+                    outcome = 'win';
+                } else {
+                    outcome = 'lose';
+                }
+
+                if (outcome === 'tie') {
+                    playerSlotEl.classList.add('slot-tie');
+                    banditSlotEl.classList.add('slot-tie');
+                    resultEl.textContent = '🔄 무승부! 다시 승부합니다...';
+                } else if (outcome === 'win') {
+                    playerWins++;
+                    playerSlotEl.classList.add('slot-win');
+                    banditSlotEl.classList.add('slot-lose');
+                    resultEl.textContent = `✨ ${playerMove.label}이(가) 산적의 ${banditMove.label}을(를) 꺾었습니다!`;
+                } else {
+                    banditWins++;
+                    playerSlotEl.classList.add('slot-lose');
+                    banditSlotEl.classList.add('slot-win');
+                    resultEl.textContent = `💀 산적의 ${banditMove.label}에 당했습니다!`;
+                }
+
+                renderPips();
+
+                const gameOver = playerWins >= WIN_NEEDED || banditWins >= WIN_NEEDED;
+
+                if (gameOver) {
+                    const won = playerWins >= WIN_NEEDED;
+                    setTimeout(() => {
+                        resultEl.innerHTML = won
+                            ? '<span class="fight-result-win">🎊 결투 승리! 산적을 물리쳤습니다!</span>'
+                            : '<span class="fight-result-lose">💀 결투 패배... 산적에게 당했습니다.</span>';
+                        btnsEl.style.opacity = '0.25';
+                        btnsEl.style.pointerEvents = 'none';
+                        setTimeout(() => {
+                            overlay.remove();
+                            if (won) onWin(); else onLose();
+                        }, 1600);
+                    }, 600);
+                } else {
+                    attempt++;
+                    roundLabelEl.textContent = `라운드 ${attempt}`;
+                    setTimeout(() => {
+                        resetArena();
+                        resultEl.textContent = '기술을 선택하세요!';
+                        setButtonsDisabled(false);
+                    }, 1100);
+                }
+            }, 180); // 결과 색상 적용 전 짧은 멈춤
+        }, 420); // 산적 기술 공개 지연 (긴장감)
+    }
+
+    btnsEl.querySelectorAll('.fight-move-btn').forEach(btn => {
+        btn.addEventListener('click', () => pickMove(btn.dataset.move));
+    });
 }
 
 // ── 레벨 표시 업데이트 ────────────────────────────────────────────────
@@ -581,4 +1327,63 @@ function updateBoardInfo() {
         `💰 ${Game.playerMoney.toLocaleString()}냥`;
     document.getElementById('board-pos-display').textContent =
         `📍 ${tile.name.replace('\n', ' ')}`;
+}
+
+// ── 최종 엔딩 ────────────────────────────────────────────────────────
+function showFinalEnding() {
+    stopBoardTimer();
+    audioManager.playBgm(BGM.SHOWTIME);
+
+    // 색종이 조각
+    const COLORS = ['#ffd700','#ff69b4','#00cfff','#ff6b6b','#90ee90','#da70d6','#ffa07a','#87ceeb'];
+    const confetti = Array.from({length: 60}, (_, i) => {
+        const c = COLORS[i % COLORS.length];
+        const left  = (Math.random() * 100).toFixed(1);
+        const dur   = (2.8 + Math.random() * 3.2).toFixed(2);
+        const delay = (Math.random() * 5).toFixed(2);
+        const size  = 5 + Math.floor(Math.random() * 7);
+        const round = Math.random() < 0.5 ? '50%' : `${Math.floor(Math.random()*3)}px`;
+        return `<div class="ending-confetti" style="left:${left}%;width:${size}px;height:${size}px;background:${c};border-radius:${round};animation-duration:${dur}s;animation-delay:${delay}s;"></div>`;
+    }).join('');
+
+    // 캐릭터 초상화
+    const chars = STAGES.map((s, i) => `
+        <div class="ending-char" style="animation-delay:${0.3 + i * 0.1}s">
+            <img src="${s.image}" class="ending-char-img" alt="${s.characterName}">
+            <div class="ending-char-name">${s.characterName}</div>
+        </div>
+    `).join('');
+
+    const ov = document.createElement('div');
+    ov.className = 'bm-overlay ending-overlay';
+    ov.innerHTML = `
+        ${confetti}
+        <div class="ending-box">
+            <div class="ending-crown">👑 &nbsp; 👑 &nbsp; 👑</div>
+            <h2 class="ending-main-title">천하화투왕 등극!</h2>
+            <div class="ending-sub">— 봉황화패를 손에 넣다 —</div>
+            <p class="ending-story">
+                팔도의 모든 화투 고수를 하나하나 평정하고<br>
+                마침내 전설의 <strong>봉황화패</strong>가 그대의 손에 안겼노라.<br><br>
+                이제 그대의 이름이 천하에 울려 퍼지니,<br>
+                진정한 <strong>천하화투왕</strong>의 자리에 오르거라!
+            </p>
+            <div class="ending-chars">${chars}</div>
+            <div class="ending-money-line">
+                💰 최종 소지금 &nbsp;<strong>${Game.playerMoney.toLocaleString()}냥</strong>
+            </div>
+            <button id="ending-close-btn" class="bm-btn bm-btn-highlight" style="margin-top:8px;">
+                ✨ 계속하기
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(ov);
+    requestAnimationFrame(() => ov.classList.add('bm-visible'));
+
+    ov.querySelector('#ending-close-btn').addEventListener('click', () => {
+        ov.classList.remove('bm-visible');
+        audioManager.playBgm(BGM.LOBBY);
+        setTimeout(() => { ov.remove(); hasRolled = false; }, 260);
+    });
 }
