@@ -1,5 +1,6 @@
 // js/minigames.js
 // 보드 타일 컬렉션 해금 미니게임 8종
+import * as Game from './game.js';
 
 function buildOverlay() {
     const ov = document.createElement('div');
@@ -189,12 +190,16 @@ export function showGomoku(onWin, onLose) {
     });
 }
 
-// ─── 2. 낚시 (Fishing) ────────────────────────────────────────────────────────
+// ─── 2. 낚시 (Fishing) — 찌 타이밍 방식 ────────────────────────────────────
 export function showFishing(onWin, onLose) {
-    const W = 400, H = 220, TARGET = 6, TIME_LIMIT = 90;
-    const FISH_TYPES = [
-        { emoji: '🐟', r: 18 }, { emoji: '🐠', r: 20 }, { emoji: '🐡', r: 16 },
-    ];
+    const W = 400, H = 280;
+    const TARGET = 5, TIME_LIMIT = 60;
+    const WATER_Y = H * 0.44;
+    const ROD_X = W * 0.28, ROD_Y = 28;
+    const BOB_X  = W * 0.62;
+
+    // 상태
+    const S = { IDLE: 0, NIBBLE: 1, BITE: 2, CAUGHT: 3, MISS: 4 };
 
     const ov = buildOverlay();
     const box = document.createElement('div');
@@ -207,60 +212,184 @@ export function showFishing(onWin, onLose) {
         </div>
         <canvas id="mg-fishing-canvas" width="${W}" height="${H}"
             style="cursor:pointer; border-radius:8px; display:block; margin:0 auto;"></canvas>
-        <p class="mg-hint">물고기를 클릭해 잡으세요!</p>
+        <p class="mg-hint">찌가 쑥 잠기는 순간 클릭! (Space 가능)</p>
     `;
     ov.appendChild(box);
 
-    const canvas   = box.querySelector('#mg-fishing-canvas');
-    const ctx      = canvas.getContext('2d');
-    const countEl  = box.querySelector('#mg-fish-count');
-    const timerEl  = box.querySelector('#mg-fish-timer');
+    const canvas  = box.querySelector('#mg-fishing-canvas');
+    const ctx     = canvas.getContext('2d');
+    const countEl = box.querySelector('#mg-fish-count');
+    const timerEl = box.querySelector('#mg-fish-timer');
 
     let caught = 0, timeLeft = TIME_LIMIT, gameOver = false, animId;
+    let state = S.IDLE, stateEnd = 0;
+    let bobDip = 0;
+    let fbText = '', fbColor = '#fff', fbAlpha = 0;
 
-    function makeFish() {
-        const t = FISH_TYPES[Math.floor(Math.random() * FISH_TYPES.length)];
-        const goRight = Math.random() < 0.5;
+    const FISH_EMOJIS = ['🐟','🐠','🐡','🐟','🐠'];
+    const fishes = Array.from({length: 5}, () => spawnFish());
+    let hookFish = null;
+
+    function spawnFish() {
         return {
-            ...t, alive: true,
-            x: goRight ? -t.r : W + t.r,
-            y: 30 + Math.random() * (H - 60),
-            vx: (goRight ? 1 : -1) * (1.2 + Math.random() * 2),
-            vy: (Math.random() - 0.5) * 0.7,
+            emoji: FISH_EMOJIS[Math.floor(Math.random() * FISH_EMOJIS.length)],
+            x: Math.random() * W,
+            y: WATER_Y + 25 + Math.random() * (H - WATER_Y - 50),
+            vx: (Math.random() - 0.5) * 1.8,
+            vy: (Math.random() - 0.5) * 0.5,
+            size: 20,
         };
     }
 
-    const fishes = Array.from({length: 8}, () => { const f = makeFish(); f.x = Math.random()*W; return f; });
-    const ripples = [];
+    function go(newState) {
+        state = newState;
+        const now = performance.now();
+        if (newState === S.IDLE) {
+            stateEnd = now + 1800 + Math.random() * 2800;
+            hookFish = null;
+        } else if (newState === S.NIBBLE) {
+            stateEnd = now + 600 + Math.random() * 700;
+            hookFish = fishes.reduce((a, b) =>
+                Math.hypot(a.x - BOB_X, a.y - (WATER_Y + 50)) <
+                Math.hypot(b.x - BOB_X, b.y - (WATER_Y + 50)) ? a : b
+            );
+        } else if (newState === S.BITE) {
+            stateEnd = now + 650 + Math.random() * 400;
+        } else if (newState === S.CAUGHT) {
+            stateEnd = now + 950;
+            fbText = '낚았다! 🎉'; fbColor = '#7ef7a0'; fbAlpha = 1;
+            caught++;
+            countEl.textContent = `🐟 ${caught} / ${TARGET}`;
+            if (caught >= TARGET) { setTimeout(() => end(true), 750); return; }
+        } else if (newState === S.MISS) {
+            stateEnd = now + 850;
+            fbText = '놓쳤다...'; fbColor = '#f99'; fbAlpha = 1;
+        }
+    }
 
-    function loop() {
+    function onInput() {
+        if (gameOver || state === S.CAUGHT || state === S.MISS) return;
+        if (state === S.BITE) go(S.CAUGHT);
+        else go(S.MISS);
+    }
+
+    canvas.addEventListener('click', onInput);
+    function onKey(e) { if (e.code === 'Space') { e.preventDefault(); onInput(); } }
+    document.addEventListener('keydown', onKey);
+
+    let lastT = performance.now();
+
+    function loop(now) {
         if (gameOver) return;
-        fishes.forEach(f => {
-            if (!f.alive) return;
-            f.x += f.vx; f.y += f.vy;
-            if (f.y < f.r) { f.y = f.r; f.vy *= -1; }
-            if (f.y > H - f.r) { f.y = H - f.r; f.vy *= -1; }
-            if (f.x < -f.r-30 || f.x > W+f.r+30) Object.assign(f, makeFish(), {alive:true});
-        });
-        for (let i = ripples.length-1; i >= 0; i--) { ripples[i].age++; if (ripples[i].age > 22) ripples.splice(i,1); }
+        lastT = now;
 
-        ctx.fillStyle = '#1a6fa0'; ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = 'rgba(100,200,255,0.10)';
-        for (let i = 0; i < 5; i++) ctx.fillRect(0, i*44, W, 18);
+        // 상태 전환
+        if (now >= stateEnd) {
+            if (state === S.IDLE)   go(S.NIBBLE);
+            else if (state === S.NIBBLE) go(S.BITE);
+            else if (state === S.BITE)   go(S.MISS);
+            else if (state === S.CAUGHT || state === S.MISS) go(S.IDLE);
+        }
 
+        // 찌 침강
+        const dipTarget = (state === S.BITE || state === S.CAUGHT) ? 30 : 0;
+        bobDip += (dipTarget - bobDip) * 0.2;
+
+        // 물고기 이동
         fishes.forEach(f => {
-            if (!f.alive) return;
-            ctx.save(); ctx.translate(f.x, f.y);
-            if (f.vx < 0) ctx.scale(-1, 1);
-            ctx.font = `${f.r*2}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
-            ctx.fillText(f.emoji, 0, 0); ctx.restore();
+            if (f === hookFish && (state === S.NIBBLE || state === S.BITE)) {
+                f.x += (BOB_X - f.x) * 0.06;
+                f.y += (WATER_Y + 55 - f.y) * 0.06;
+            } else {
+                f.x += f.vx; f.y += f.vy;
+                if (f.x < -30) f.x = W + 30;
+                if (f.x > W + 30) f.x = -30;
+                if (f.y < WATER_Y + 12 || f.y > H - 12) f.vy *= -1;
+            }
         });
-        ripples.forEach(rp => {
-            const a = 1 - rp.age/22;
-            ctx.strokeStyle = `rgba(255,255,255,${a*0.7})`; ctx.lineWidth = 1.5;
-            ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.age*2.2, 0, Math.PI*2); ctx.stroke();
-        });
+
+        if (fbAlpha > 0) fbAlpha = Math.max(0, fbAlpha - 0.018);
+
+        draw(now);
         animId = requestAnimationFrame(loop);
+    }
+
+    function draw(now) {
+        // 하늘
+        const sky = ctx.createLinearGradient(0, 0, 0, WATER_Y);
+        sky.addColorStop(0, '#87ceeb'); sky.addColorStop(1, '#c8eaf8');
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, W, WATER_Y);
+
+        // 물
+        const sea = ctx.createLinearGradient(0, WATER_Y, 0, H);
+        sea.addColorStop(0, '#1a6fa0'); sea.addColorStop(1, '#0a3a5c');
+        ctx.fillStyle = sea; ctx.fillRect(0, WATER_Y, W, H - WATER_Y);
+
+        // 수면 반짝임
+        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        [20, 90, 160, 240, 320].forEach((x, i) =>
+            ctx.fillRect(x, WATER_Y + 5 + (i % 2) * 14, 50, 4)
+        );
+
+        // 낚싯대
+        ctx.strokeStyle = '#7a3b0a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(ROD_X - 55, H * 0.04); ctx.lineTo(ROD_X, ROD_Y); ctx.stroke();
+
+        // 낚싯줄
+        const bobY = WATER_Y + bobDip + Math.sin(now * 0.002) * (state === S.IDLE ? 2 : 0);
+        ctx.strokeStyle = 'rgba(220,220,220,0.7)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(ROD_X, ROD_Y); ctx.lineTo(BOB_X, bobY); ctx.stroke();
+
+        // 찌 흔들림
+        const nib = state === S.NIBBLE ? Math.sin(now * 0.025) * 4 : 0;
+
+        // 찌 막대
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fillRect(BOB_X - 1.5, bobY - 14 + nib, 3, 14);
+
+        // 찌 몸통
+        const bobColor = state === S.BITE    ? '#ff3333'
+                       : state === S.NIBBLE  ? '#ffaa00'
+                       : state === S.CAUGHT  ? '#44dd66'
+                       :                       '#ff7766';
+        ctx.beginPath();
+        ctx.ellipse(BOB_X, bobY + 5 + nib, 7, 11, 0, 0, Math.PI * 2);
+        ctx.fillStyle = bobColor; ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(BOB_X, bobY + 9 + nib, 7, 5, 0, 0, Math.PI);
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill();
+
+        // 물고기
+        fishes.forEach(f => {
+            ctx.save(); ctx.translate(f.x, f.y);
+            const goLeft = f.vx < 0 || (f === hookFish && BOB_X < f.x);
+            if (goLeft) ctx.scale(-1, 1);
+            ctx.font = `${f.size}px serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(f.emoji, 0, 0);
+            ctx.restore();
+        });
+
+        // 상태 힌트
+        const hint = state === S.IDLE    ? '대기 중...'
+                   : state === S.NIBBLE  ? '찌가 흔들립니다...'
+                   : state === S.BITE    ? '지금!'
+                   : '';
+        const hintColor = state === S.BITE   ? `rgba(255,${80 + Math.floor(Math.sin(now*0.025)*80)},50,1)`
+                        : state === S.NIBBLE ? '#ffcc44'
+                        :                      'rgba(255,255,255,0.45)';
+        ctx.font = 'bold 15px sans-serif';
+        ctx.textAlign = 'center'; ctx.fillStyle = hintColor;
+        ctx.fillText(hint, W / 2, H - 14);
+
+        // 피드백
+        if (fbAlpha > 0) {
+            ctx.globalAlpha = fbAlpha;
+            ctx.font = 'bold 20px sans-serif';
+            ctx.fillStyle = fbColor; ctx.textAlign = 'center';
+            ctx.fillText(fbText, W / 2, WATER_Y - 16);
+            ctx.globalAlpha = 1;
+        }
     }
 
     const timerIv = setInterval(() => {
@@ -270,29 +399,15 @@ export function showFishing(onWin, onLose) {
     }, 1000);
 
     function end(won) {
-        gameOver = true; cancelAnimationFrame(animId); clearInterval(timerIv);
+        gameOver = true;
+        cancelAnimationFrame(animId);
+        clearInterval(timerIv);
+        document.removeEventListener('keydown', onKey);
         setTimeout(() => closeOverlay(ov, won ? onWin : onLose), 700);
     }
 
-    canvas.addEventListener('click', e => {
-        if (gameOver) return;
-        const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left) * (W/rect.width);
-        const my = (e.clientY - rect.top)  * (H/rect.height);
-        for (const f of fishes) {
-            if (!f.alive) continue;
-            const dx = f.x-mx, dy = f.y-my;
-            if (dx*dx + dy*dy < (f.r+10)*(f.r+10)) {
-                f.alive = false; ripples.push({x:f.x, y:f.y, age:0});
-                countEl.textContent = `🐟 ${++caught} / ${TARGET}`;
-                setTimeout(() => { Object.assign(f, makeFish()); f.alive = true; }, 1800);
-                if (caught >= TARGET) end(true);
-                break;
-            }
-        }
-    });
-
-    loop();
+    go(S.IDLE);
+    animId = requestAnimationFrame(loop);
 }
 
 // ─── 3. 숫자야구 (Number Baseball) ────────────────────────────────────────────
@@ -373,11 +488,37 @@ export function showNumberBaseball(onWin, onLose) {
 
 // ─── 4. 벽돌깨기 (Breakout) ───────────────────────────────────────────────────
 export function showBreakout(onWin, onLose) {
-    const W=400, H=280, PAD_W=64, PAD_H=10, PAD_Y=H-26, BALL_R=7;
+    // 수집된 배경 중 랜덤 선택
+    const allBgs = [];
+    for (const [stageId, bgIds] of Object.entries(Game.unlockedBackgrounds || {})) {
+        for (const bgId of bgIds) {
+            allBgs.push(`images/stages/stage${stageId}/showtime_bg_stage${stageId}_${String(bgId).padStart(2,'0')}.jpg`);
+        }
+    }
+
+    if (allBgs.length > 0) {
+        const src = allBgs[Math.floor(Math.random() * allBgs.length)];
+        const img = new Image();
+        img.onload  = () => _startBreakout(onWin, onLose, img);
+        img.onerror = () => _startBreakout(onWin, onLose, null);
+        img.src = src;
+    } else {
+        _startBreakout(onWin, onLose, null);
+    }
+}
+
+function _startBreakout(onWin, onLose, bgImg) {
+    const W = 400;
+    const H = bgImg
+        ? Math.min(560, Math.round(W * bgImg.naturalHeight / bgImg.naturalWidth))
+        : 280;
+
+    const PAD_W=64, PAD_H=10, PAD_Y=H-26, BALL_R=7;
     const BRICK_COLS=8, BRICK_ROWS=4;
     const BRICK_W=Math.floor((W-20)/BRICK_COLS), BRICK_H=18, BRICK_TOP=28;
     const ROW_COLORS=['#ff6666','#ffaa44','#ffee44','#44cc88'];
     const INIT_LIVES=3;
+    const ITEM_R=9, ITEM_SPEED=2.2, ITEM_CHANCE=0.28;
 
     const ov = buildOverlay();
     const box = document.createElement('div');
@@ -386,21 +527,24 @@ export function showBreakout(onWin, onLose) {
         <h3 class="bm-title">🧱 벽돌깨기</h3>
         <div class="mg-info-row">
             <span id="brk-lives">❤️ × ${INIT_LIVES}</span>
+            <span id="brk-balls">🔵 × 1</span>
             <span id="brk-left">벽돌: ${BRICK_ROWS*BRICK_COLS}</span>
         </div>
         <canvas id="mg-brk-canvas" width="${W}" height="${H}"
             style="display:block; margin:0 auto; border-radius:6px;"></canvas>
-        <p class="mg-hint">마우스로 패들을 조종하세요</p>
+        <p class="mg-hint">마우스로 패들 조종 &nbsp;|&nbsp; 💚 아이템 = 공 추가</p>
     `;
     ov.appendChild(box);
 
-    const canvas   = box.querySelector('#mg-brk-canvas');
-    const ctx      = canvas.getContext('2d');
-    const livesEl  = box.querySelector('#brk-lives');
-    const leftEl   = box.querySelector('#brk-left');
+    const canvas  = box.querySelector('#mg-brk-canvas');
+    const ctx     = canvas.getContext('2d');
+    const livesEl = box.querySelector('#brk-lives');
+    const ballsEl = box.querySelector('#brk-balls');
+    const leftEl  = box.querySelector('#brk-left');
 
     let lives=INIT_LIVES, gameOver=false, animId, padX=W/2-PAD_W/2;
-    let bx=W/2, by=H/2-40, vx=3, vy=-3.8;
+    let balls = [{ x:W/2, y:H/2-40, vx:3, vy:-3.8 }];
+    let items = [];
 
     const bricks = [];
     for (let r=0;r<BRICK_ROWS;r++) for (let c=0;c<BRICK_COLS;c++)
@@ -418,53 +562,382 @@ export function showBreakout(onWin, onLose) {
     }, {passive:false});
 
     function draw() {
-        ctx.fillStyle='#1a1a2e'; ctx.fillRect(0,0,W,H);
+        if (bgImg) {
+            ctx.drawImage(bgImg, 0, 0, W, H);
+            ctx.fillStyle='rgba(0,0,0,0.5)';
+            ctx.fillRect(0,0,W,H);
+        } else {
+            ctx.fillStyle='#1a1a2e';
+            ctx.fillRect(0,0,W,H);
+        }
         bricks.forEach(b => {
             if (!b.alive) return;
             ctx.fillStyle=b.color; ctx.fillRect(b.x+1,b.y+1,BRICK_W-3,BRICK_H-3);
             ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillRect(b.x+2,b.y+2,BRICK_W-4,5);
         });
+        // 낙하 아이템
+        items.forEach(it => {
+            const ig = ctx.createRadialGradient(it.x-2, it.y-2, 1, it.x, it.y, ITEM_R);
+            ig.addColorStop(0,'#aaffcc'); ig.addColorStop(1,'#00aa44');
+            ctx.beginPath(); ctx.arc(it.x, it.y, ITEM_R, 0, Math.PI*2);
+            ctx.fillStyle=ig; ctx.fill();
+            ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+            ctx.fillStyle='#fff'; ctx.font='bold 8px sans-serif';
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText('+1', it.x, it.y);
+        });
+        // 패들
         const pg=ctx.createLinearGradient(padX,PAD_Y,padX,PAD_Y+PAD_H);
         pg.addColorStop(0,'#88ccff'); pg.addColorStop(1,'#4488bb');
         ctx.fillStyle=pg; ctx.fillRect(padX,PAD_Y,PAD_W,PAD_H);
-        const bg=ctx.createRadialGradient(bx-2,by-2,1,bx,by,BALL_R);
-        bg.addColorStop(0,'#fff'); bg.addColorStop(1,'#aae');
-        ctx.beginPath(); ctx.arc(bx,by,BALL_R,0,Math.PI*2); ctx.fillStyle=bg; ctx.fill();
+        // 공
+        balls.forEach(ball => {
+            const bg=ctx.createRadialGradient(ball.x-2,ball.y-2,1,ball.x,ball.y,BALL_R);
+            bg.addColorStop(0,'#fff'); bg.addColorStop(1,'#aae');
+            ctx.beginPath(); ctx.arc(ball.x,ball.y,BALL_R,0,Math.PI*2);
+            ctx.fillStyle=bg; ctx.fill();
+        });
     }
 
-    function update() {
-        bx+=vx; by+=vy;
-        if (bx-BALL_R<0){bx=BALL_R;vx=Math.abs(vx);}
-        if (bx+BALL_R>W){bx=W-BALL_R;vx=-Math.abs(vx);}
-        if (by-BALL_R<0){by=BALL_R;vy=Math.abs(vy);}
-        if (by+BALL_R>=PAD_Y && by+BALL_R<=PAD_Y+PAD_H+5 && bx>=padX-4 && bx<=padX+PAD_W+4 && vy>0) {
-            vx=((bx-(padX+PAD_W/2))/(PAD_W/2))*5;
-            vy=-Math.abs(vy); by=PAD_Y-BALL_R;
+    // 공 하나 업데이트. 반환값: true=아웃(제거), 'win'=전체 벽돌 제거
+    function updateBall(ball) {
+        ball.x+=ball.vx; ball.y+=ball.vy;
+        if (ball.x-BALL_R<0){ball.x=BALL_R;ball.vx=Math.abs(ball.vx);}
+        if (ball.x+BALL_R>W){ball.x=W-BALL_R;ball.vx=-Math.abs(ball.vx);}
+        if (ball.y-BALL_R<0){ball.y=BALL_R;ball.vy=Math.abs(ball.vy);}
+        if (ball.y+BALL_R>=PAD_Y && ball.y+BALL_R<=PAD_Y+PAD_H+5 &&
+            ball.x>=padX-4 && ball.x<=padX+PAD_W+4 && ball.vy>0) {
+            ball.vx=((ball.x-(padX+PAD_W/2))/(PAD_W/2))*5;
+            ball.vy=-Math.abs(ball.vy); ball.y=PAD_Y-BALL_R;
         }
         for (const b of bricks) {
             if (!b.alive) continue;
-            if (bx+BALL_R>b.x && bx-BALL_R<b.x+BRICK_W && by+BALL_R>b.y && by-BALL_R<b.y+BRICK_H) {
+            if (ball.x+BALL_R>b.x && ball.x-BALL_R<b.x+BRICK_W &&
+                ball.y+BALL_R>b.y && ball.y-BALL_R<b.y+BRICK_H) {
                 b.alive=false; bricksLeft--;
                 leftEl.textContent=`벽돌: ${bricksLeft}`;
-                const ox=Math.min(bx+BALL_R-b.x,b.x+BRICK_W-(bx-BALL_R));
-                const oy=Math.min(by+BALL_R-b.y,b.y+BRICK_H-(by-BALL_R));
-                if (ox<oy) vx=-vx; else vy=-vy;
-                if (bricksLeft===0) { gameOver=true; cancelAnimationFrame(animId); draw(); setTimeout(()=>closeOverlay(ov,onWin),800); return; }
+                if (Math.random() < ITEM_CHANCE)
+                    items.push({ x:b.x+BRICK_W/2, y:b.y+BRICK_H/2, vy:ITEM_SPEED });
+                const ox=Math.min(ball.x+BALL_R-b.x,b.x+BRICK_W-(ball.x-BALL_R));
+                const oy=Math.min(ball.y+BALL_R-b.y,b.y+BRICK_H-(ball.y-BALL_R));
+                if (ox<oy) ball.vx=-ball.vx; else ball.vy=-ball.vy;
+                if (bricksLeft===0) return 'win';
                 break;
             }
         }
-        if (by-BALL_R>H) {
-            lives--; livesEl.textContent=`❤️ × ${lives}`;
-            if (lives<=0) { gameOver=true; cancelAnimationFrame(animId); draw(); setTimeout(()=>closeOverlay(ov,onLose),800); return; }
-            bx=W/2; by=H/2-40; vx=3; vy=-3.8;
+        return ball.y-BALL_R>H;
+    }
+
+    function update() {
+        const lost=[];
+        for (let i=0; i<balls.length; i++) {
+            const r=updateBall(balls[i]);
+            if (r==='win') { end(true); return; }
+            if (r===true) lost.push(i);
         }
+        for (let i=lost.length-1; i>=0; i--) balls.splice(lost[i],1);
+        if (balls.length===0) {
+            lives--; livesEl.textContent=`❤️ × ${lives}`;
+            if (lives<=0) { end(false); return; }
+            balls=[{x:W/2, y:H/2-40, vx:3, vy:-3.8}];
+            items=[];
+        }
+        ballsEl.textContent=`🔵 × ${balls.length}`;
+
+        // 낙하 아이템 업데이트
+        const kept=[];
+        for (const it of items) {
+            it.y+=it.vy;
+            if (it.y+ITEM_R>=PAD_Y && it.y-ITEM_R<=PAD_Y+PAD_H &&
+                it.x>=padX-4 && it.x<=padX+PAD_W+4) {
+                // 패들이 아이템 캐치 → 새 공 추가
+                const angle=(Math.random()*0.8-0.4)-Math.PI/2;
+                const spd=3.8;
+                balls.push({x:padX+PAD_W/2, y:PAD_Y-BALL_R-1,
+                            vx:Math.cos(angle)*spd, vy:Math.sin(angle)*spd});
+            } else if (it.y+ITEM_R<H) {
+                kept.push(it);
+            }
+        }
+        items=kept;
+    }
+
+    function end(won) {
+        gameOver=true;
+        cancelAnimationFrame(animId);
+        draw();
+        setTimeout(()=>closeOverlay(ov, won?onWin:onLose), 800);
     }
 
     function loop() { if (gameOver) return; update(); draw(); animId=requestAnimationFrame(loop); }
     loop();
 }
 
-// ─── 5. 수도쿠 (Sudoku) ──────────────────────────────────────────────────────
+// ─── 5. 테트리스 (Tetris) ─────────────────────────────────────────────────────
+export function showTetris(onWin, onLose) {
+    const allBgs = [];
+    for (const [stageId, bgIds] of Object.entries(Game.unlockedBackgrounds || {}))
+        for (const bgId of bgIds)
+            allBgs.push(`images/stages/stage${stageId}/showtime_bg_stage${stageId}_${String(bgId).padStart(2,'0')}.jpg`);
+
+    if (allBgs.length > 0) {
+        const src = allBgs[Math.floor(Math.random() * allBgs.length)];
+        const img = new Image();
+        img.onload  = () => _startTetris(onWin, onLose, img);
+        img.onerror = () => _startTetris(onWin, onLose, null);
+        img.src = src;
+    } else {
+        _startTetris(onWin, onLose, null);
+    }
+}
+
+function _startTetris(onWin, onLose, bgImg) {
+    const COLS = 10, ROWS = 14, CELL = 44;
+    const CW = COLS * CELL, CH = ROWS * CELL;
+    const WIN_LINES = 6;
+
+    const PIECES = [
+        { shape: [[1,1,1,1]],              color: '#00f0f0' }, // I
+        { shape: [[1,1],[1,1]],            color: '#f0f000' }, // O
+        { shape: [[0,1,0],[1,1,1]],        color: '#a000f0' }, // T
+        { shape: [[0,1,1],[1,1,0]],        color: '#00c000' }, // S
+        { shape: [[1,1,0],[0,1,1]],        color: '#f00000' }, // Z
+        { shape: [[1,0,0],[1,1,1]],        color: '#0000f0' }, // J
+        { shape: [[0,0,1],[1,1,1]],        color: '#f0a000' }, // L
+    ];
+
+    const ov = buildOverlay();
+    const box = document.createElement('div');
+    box.className = 'bm-box mg-box';
+    box.style.maxWidth = `${CW + 100}px`;
+    box.innerHTML = `
+        <h3 class="bm-title">⛓ 형옥 탈출 테트리스</h3>
+        <div class="mg-info-row">
+            <span id="tet-lines">줄 제거: 0 / ${WIN_LINES}</span>
+            <span id="tet-score" style="color:#aaa; font-size:0.85em;">NEXT</span>
+        </div>
+        <div style="display:flex; gap:8px; justify-content:center; align-items:flex-start;">
+            <canvas id="mg-tet-canvas" width="${CW}" height="${CH}"
+                style="display:block; border-radius:4px;"></canvas>
+            <canvas id="mg-tet-next" width="80" height="80"
+                style="border-radius:4px; background:#111; flex-shrink:0;"></canvas>
+        </div>
+        <p class="mg-hint">← → 이동 &nbsp;|&nbsp; ↑ 회전 &nbsp;|&nbsp; Space 즉시 낙하 &nbsp;|&nbsp; 터치: 탭=회전, 좌우스와이프=이동, 아래스와이프=즉시낙하</p>
+    `;
+    ov.appendChild(box);
+
+    const canvas   = box.querySelector('#mg-tet-canvas');
+    const ctx      = canvas.getContext('2d');
+    const nextCvs  = box.querySelector('#mg-tet-next');
+    const nextCtx  = nextCvs.getContext('2d');
+    const linesEl  = box.querySelector('#tet-lines');
+
+    const board = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    let linesCleared = 0, gameOver = false, dropTimer = null;
+
+    function randPiece() {
+        const t = PIECES[Math.floor(Math.random() * PIECES.length)];
+        return {
+            shape: t.shape.map(r => [...r]),
+            color: t.color,
+            x: Math.floor(COLS / 2) - Math.floor(t.shape[0].length / 2),
+            y: 0,
+        };
+    }
+
+    let cur = randPiece(), nxt = randPiece();
+
+    function rotate(shape) {
+        const R = shape.length, C = shape[0].length;
+        return Array.from({length: C}, (_, c) =>
+            Array.from({length: R}, (_, r) => shape[R - 1 - r][c])
+        );
+    }
+
+    function valid(shape, x, y) {
+        for (let r = 0; r < shape.length; r++)
+            for (let c = 0; c < shape[r].length; c++) {
+                if (!shape[r][c]) continue;
+                const nx = x + c, ny = y + r;
+                if (nx < 0 || nx >= COLS || ny >= ROWS) return false;
+                if (ny >= 0 && board[ny][nx]) return false;
+            }
+        return true;
+    }
+
+    function place() {
+        for (let r = 0; r < cur.shape.length; r++)
+            for (let c = 0; c < cur.shape[r].length; c++) {
+                if (!cur.shape[r][c]) continue;
+                if (cur.y + r < 0) { end(false); return; }
+                board[cur.y + r][cur.x + c] = cur.color;
+            }
+        sweepLines();
+        cur = nxt;
+        nxt = randPiece();
+        if (!valid(cur.shape, cur.x, cur.y)) end(false);
+    }
+
+    function sweepLines() {
+        let cleared = 0;
+        for (let r = ROWS - 1; r >= 0; r--) {
+            if (board[r].every(v => v !== 0)) {
+                board.splice(r, 1);
+                board.unshift(Array(COLS).fill(0));
+                cleared++; r++;
+            }
+        }
+        if (cleared === 0) return;
+        linesCleared += cleared;
+        linesEl.textContent = `줄 제거: ${linesCleared} / ${WIN_LINES}`;
+        if (linesCleared >= WIN_LINES) end(true);
+    }
+
+    function end(won) {
+        gameOver = true;
+        clearInterval(dropTimer);
+        document.removeEventListener('keydown', onKey);
+        draw();
+        setTimeout(() => closeOverlay(ov, won ? onWin : onLose), 700);
+    }
+
+    function drop() {
+        if (gameOver) return;
+        if (valid(cur.shape, cur.x, cur.y + 1)) cur.y++;
+        else place();
+        draw();
+    }
+
+    function hardDrop() {
+        while (valid(cur.shape, cur.x, cur.y + 1)) cur.y++;
+        place();
+        draw();
+    }
+
+    function ghostY() {
+        let gy = cur.y;
+        while (valid(cur.shape, cur.x, gy + 1)) gy++;
+        return gy;
+    }
+
+    function drawCell(c2d, x, y, color, cs) {
+        c2d.fillStyle = color;
+        c2d.fillRect(x * cs + 1, y * cs + 1, cs - 2, cs - 2);
+        c2d.fillStyle = 'rgba(255,255,255,0.22)';
+        c2d.fillRect(x * cs + 2, y * cs + 2, cs - 4, 3);
+    }
+
+    function draw() {
+        // 보드 배경
+        if (bgImg) {
+            ctx.drawImage(bgImg, 0, 0, CW, CH);
+            ctx.fillStyle = 'rgba(0,0,0,0.55)';
+            ctx.fillRect(0, 0, CW, CH);
+        } else {
+            ctx.fillStyle = '#111'; ctx.fillRect(0, 0, CW, CH);
+        }
+        // 내부 격자선 (외곽 제외)
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 1;
+        for (let r = 1; r < ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r*CELL); ctx.lineTo(CW, r*CELL); ctx.stroke(); }
+        for (let c = 1; c < COLS; c++) { ctx.beginPath(); ctx.moveTo(c*CELL, 0); ctx.lineTo(c*CELL, CH); ctx.stroke(); }
+        // 외곽 테두리
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.strokeRect(0.5, 0.5, CW - 1, CH - 1);
+
+        // 고정된 블록
+        for (let r = 0; r < ROWS; r++)
+            for (let c = 0; c < COLS; c++)
+                if (board[r][c]) drawCell(ctx, c, r, board[r][c], CELL);
+
+        // 고스트
+        const gy = ghostY();
+        if (gy !== cur.y) {
+            for (let r = 0; r < cur.shape.length; r++)
+                for (let c = 0; c < cur.shape[r].length; c++)
+                    if (cur.shape[r][c]) {
+                        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                        ctx.fillRect((cur.x+c)*CELL+1, (gy+r)*CELL+1, CELL-2, CELL-2);
+                    }
+        }
+
+        // 현재 피스
+        for (let r = 0; r < cur.shape.length; r++)
+            for (let c = 0; c < cur.shape[r].length; c++)
+                if (cur.shape[r][c]) drawCell(ctx, cur.x+c, cur.y+r, cur.color, CELL);
+
+        // 다음 피스 미리보기
+        nextCtx.fillStyle = '#111'; nextCtx.fillRect(0, 0, 80, 80);
+        const ns = nxt.shape, cs2 = 16;
+        const ox = Math.floor((4 - ns[0].length) / 2) * cs2 + 4;
+        const oy = Math.floor((4 - ns.length) / 2) * cs2 + 4;
+        for (let r = 0; r < ns.length; r++)
+            for (let c = 0; c < ns[r].length; c++)
+                if (ns[r][c]) {
+                    nextCtx.fillStyle = nxt.color;
+                    nextCtx.fillRect(ox + c*cs2 + 1, oy + r*cs2 + 1, cs2 - 2, cs2 - 2);
+                    nextCtx.fillStyle = 'rgba(255,255,255,0.22)';
+                    nextCtx.fillRect(ox + c*cs2 + 2, oy + r*cs2 + 2, cs2 - 3, 3);
+                }
+    }
+
+    function onKey(e) {
+        if (gameOver) return;
+        switch (e.key) {
+            case 'ArrowLeft':
+                if (valid(cur.shape, cur.x - 1, cur.y)) { cur.x--; draw(); }
+                break;
+            case 'ArrowRight':
+                if (valid(cur.shape, cur.x + 1, cur.y)) { cur.x++; draw(); }
+                break;
+            case 'ArrowDown':
+                drop(); break;
+            case 'ArrowUp': {
+                const rot = rotate(cur.shape);
+                if (valid(rot, cur.x, cur.y)) { cur.shape = rot; draw(); }
+                break;
+            }
+            case ' ':
+                e.preventDefault();
+                hardDrop();
+                break;
+        }
+    }
+
+    document.addEventListener('keydown', onKey);
+
+    // 터치 스와이프 컨트롤 (모바일)
+    let touchStartX = 0, touchStartY = 0;
+    const canvas2 = box.querySelector('#mg-tet-canvas');
+    canvas2.addEventListener('touchstart', e => {
+        e.preventDefault();
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }, { passive: false });
+    canvas2.addEventListener('touchend', e => {
+        if (gameOver) return;
+        e.preventDefault();
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        const absDx = Math.abs(dx), absDy = Math.abs(dy);
+        if (absDx < 8 && absDy < 8) {
+            // 탭 → 회전
+            const rot = rotate(cur.shape);
+            if (valid(rot, cur.x, cur.y)) { cur.shape = rot; draw(); }
+        } else if (absDx > absDy) {
+            if (dx > 0) { if (valid(cur.shape, cur.x+1, cur.y)) { cur.x++; draw(); } }
+            else        { if (valid(cur.shape, cur.x-1, cur.y)) { cur.x--; draw(); } }
+        } else {
+            if (dy > 0) hardDrop();
+            else { const rot = rotate(cur.shape); if (valid(rot, cur.x, cur.y)) { cur.shape = rot; draw(); } }
+        }
+    }, { passive: false });
+
+    dropTimer = setInterval(drop, 600);
+    draw();
+}
+
+// ─── 6. 수도쿠 (Sudoku) ──────────────────────────────────────────────────────
 export function showSudoku(onWin, onLose) {
     // ── 퍼즐 생성 ─────────────────────────────────────────────────────
     function valid(g, r, c, n) {
@@ -899,4 +1372,78 @@ export function showPickpocket(onWin, onLose) {
 
     const spawnIv=setInterval(()=>{ if(!gameOver) spawnOne(); },650);
     render();
+}
+
+// ─── 과거 시험 (조선 상식 퀴즈) ──────────────────────────────────────────────
+const GWAGEO_QUESTIONS = [
+    { q: '조선을 건국한 왕은?',                        choices: ['태종 이방원','태조 이성계','세종대왕','광해군'],      answer: 1 },
+    { q: '훈민정음을 창제한 왕은?',                    choices: ['태종','태조','세종','성종'],                          answer: 2 },
+    { q: '조선의 수도는?',                             choices: ['개성','평양','경주','한양'],                          answer: 3 },
+    { q: '임진왜란이 일어난 해는?',                    choices: ['1392년','1492년','1592년','1692년'],                 answer: 2 },
+    { q: '거북선을 이끌어 왜군을 물리친 장군은?',      choices: ['곽재우','권율','신립','이순신'],                     answer: 3 },
+    { q: '조선의 최고 행정기관은?',                    choices: ['사헌부','홍문관','의정부','승정원'],                 answer: 2 },
+    { q: '조선시대 최고 국립 교육기관은?',             choices: ['서원','향교','서당','성균관'],                       answer: 3 },
+    { q: '조선의 기본 법전은?',                        choices: ['속대전','경국대전','대명률','경제육전'],              answer: 1 },
+    { q: '훈민정음이 반포된 해는?',                    choices: ['1392년','1443년','1446년','1504년'],                 answer: 2 },
+    { q: '조선시대 지방 관립 교육기관은?',             choices: ['성균관','서원','서당','향교'],                       answer: 3 },
+    { q: '병자호란이 일어난 해는?',                    choices: ['1592년','1597년','1627년','1636년'],                 answer: 3 },
+    { q: '조선을 건국한 해는?',                        choices: ['1388년','1392년','1400년','1418년'],                 answer: 1 },
+    { q: '조선시대 왕명을 출납하던 기관은?',           choices: ['사헌부','사간원','홍문관','승정원'],                 answer: 3 },
+    { q: '행주대첩을 이끈 장군은?',                    choices: ['이순신','곽재우','권율','신립'],                     answer: 2 },
+    { q: '조선시대 관리의 비리를 감찰하던 기관은?',    choices: ['의정부','승정원','사헌부','홍문관'],                 answer: 2 },
+    { q: '조선 후기 실학을 집대성한 학자는?',          choices: ['이황','이이','정약용','송시열'],                     answer: 2 },
+    { q: '조선시대 지방 도(道)의 최고 책임자는?',      choices: ['목사','판관','관찰사','현감'],                       answer: 2 },
+    { q: '조선의 건국 이념(통치 사상)은?',             choices: ['불교','도교','유교','무속'],                         answer: 2 },
+    { q: '조선왕조 이전의 나라는?',                    choices: ['신라','백제','발해','고려'],                         answer: 3 },
+    { q: '사헌부·사간원·홍문관을 통틀어 부르는 말은?', choices: ['삼사','삼정승','삼군부','삼의사'],                   answer: 0 },
+];
+
+export function showGwageo(onDone) {
+    const NUMS = ['①','②','③','④'];
+    const picked = [...GWAGEO_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, 5);
+
+    const ov = buildOverlay();
+    const box = document.createElement('div');
+    box.className = 'bm-box mg-box';
+    box.style.maxWidth = '380px';
+    ov.appendChild(box);
+
+    let qIdx = 0, correct = 0;
+
+    function showQ() {
+        const q = picked[qIdx];
+        box.innerHTML = `
+            <h3 class="bm-title">📜 과거 시험</h3>
+            <div class="mg-info-row">
+                <span>문제 ${qIdx + 1} / 5</span>
+                <span>정답 <b>${correct}</b>개</span>
+            </div>
+            <p class="gwageo-question">${q.q}</p>
+            <div class="gwageo-choices">
+                ${q.choices.map((c, i) => `
+                    <button class="gwageo-btn" data-i="${i}">
+                        <span class="gwageo-num">${NUMS[i]}</span>${c}
+                    </button>
+                `).join('')}
+            </div>
+        `;
+        box.querySelectorAll('.gwageo-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const chosen = parseInt(btn.dataset.i);
+                if (chosen === q.answer) correct++;
+                box.querySelectorAll('.gwageo-btn').forEach((b, i) => {
+                    b.disabled = true;
+                    if (i === q.answer) b.classList.add('gwageo-correct');
+                    else if (i === chosen) b.classList.add('gwageo-wrong');
+                });
+                setTimeout(() => {
+                    qIdx++;
+                    if (qIdx < 5) showQ();
+                    else closeOverlay(ov, () => onDone(correct));
+                }, 1000);
+            });
+        });
+    }
+
+    showQ();
 }

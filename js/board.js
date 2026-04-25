@@ -9,7 +9,7 @@ import * as SlidePuzzle from './slidepuzzle.js';
 import { audioManager, BGM } from './audio.js';
 import {
     showGomoku, showFishing, showNumberBaseball, showBreakout,
-    showSudoku, showMinesweeper, showArrowDodge, showPickpocket,
+    showSudoku, showMinesweeper, showArrowDodge, showPickpocket, showTetris, showGwageo,
 } from './minigames.js';
 
 // ── 보드 타일 정의 (24칸) ─────────────────────────────────────────────
@@ -31,17 +31,17 @@ export const BOARD_TILES = [
     // 우하단 코너 (12)
     { id: 12, type: 'nugang',    name: '누각',        icon: '🌙', corner: true },
     // 하단 우→좌 (13~17)
-    { id: 13, type: 'gwana',     name: '관아',        icon: '🏛' },
+    { id: 13, type: 'hyeongok',  name: '형옥',        icon: '⛓' },
     { id: 14, type: 'character', name: '채아',        stageId: 5 },
     { id: 15, type: 'gibang',    name: '기방',        icon: '🌺' },
     { id: 16, type: 'character', name: '서린',        stageId: 6 },
-    { id: 17, type: 'jujak',     name: '주막',        icon: '🍶' },
+    { id: 17, type: 'gaekju',    name: '객주',        icon: '💰' },
     // 좌하단 코너 (18)
     { id: 18, type: 'dobakjang', name: '도박장',      icon: '🎰', corner: true },
     // 좌측 하→상 (19~23)
     { id: 19, type: 'bangnanggaek', name: '방랑객',   icon: '🧳' },
     { id: 20, type: 'character', name: '혜화',        stageId: 7 },
-    { id: 21, type: 'giyeon',    name: '기연',        icon: '🌸' },
+    { id: 21, type: 'gwageo',    name: '과거장',       icon: '📜' },
     { id: 22, type: 'character', name: '봉황',        stageId: 8 },
     { id: 23, type: 'bobusang',  name: '보부상',      icon: '💼' },
 ];
@@ -59,7 +59,10 @@ const TILE_TOOLTIPS = {
     start:        '출발점 통과 +10,000냥 보너스',
     giyeon:       '패 3장 중 선택 — 기연의 인연',
     jujak:        '밥 한 끼 or 막걸리 내기',
+    gaekju:       '냥을 맡기고 재방문 시 이자 정산 (등급별 도박)',
+    gwageo:       '조선 상식 5문제 — 정답 수에 따라 보상 차등',
     gwana:        '납세 순순히 or 뇌물 시도',
+    hyeongok:     '잡혀갔습니다! 테트리스로 탈출 도전',
     nugang:       '패 3장 중 선택 — 경치 감상',
     sanjeok:      '도주 / 결투(강타·속공·방어) / 몸값 선택',
     oncheon:      '탕 3종 중 선택 — 피로 회복',
@@ -92,6 +95,7 @@ const MG_REWARDS = {
     minesweeper: { win: 35000, lose: 5000  },
     arrowdodge:  { win: 40000, lose: 8000  },
     pickpocket:  { win: 35000, lose: 5000  },
+    tetris:      { win: 40000, lose: 8000  },
 };
 
 function applyMgResult(won, key) {
@@ -119,6 +123,9 @@ let playerPosition = 0;
 let isMoving = false;
 let hasRolled = false;
 let _onGameStart = null;
+
+// 객주 예치금 상태: null 또는 { amount, grade: 'safe'|'normal'|'high' }
+let gaekjuDeposit = null;
 
 let countdownTimer = null;
 let incomeSecondsLeft = INCOME_INTERVAL_SEC;
@@ -174,6 +181,7 @@ export function initBoard(onGameStart) {
     playerPosition = 0;
     isMoving = false;
     hasRolled = false;
+    gaekjuDeposit = null;
     incomeSecondsLeft = INCOME_INTERVAL_SEC;
     renderBoard();
     // 렌더 후 토큰 배치 (requestAnimationFrame으로 레이아웃 완료 후)
@@ -238,6 +246,9 @@ function renderBoard() {
         if (tile.type === 'dobakjang')    el.classList.add('tile-dobakjang');
         if (tile.type === 'bangnanggaek') el.classList.add('tile-bangnanggaek');
         if (tile.type === 'bobusang')     el.classList.add('tile-bobusang');
+        if (tile.type === 'gaekju')       el.classList.add('tile-gaekju');
+        if (tile.type === 'hyeongok')     el.classList.add('tile-hyeongok');
+        if (tile.type === 'gwageo')       el.classList.add('tile-gwageo');
 
         if (tile.type === 'character') {
             const stage = STAGES.find(s => s.id === tile.stageId);
@@ -598,10 +609,32 @@ function landOnTile(pos) {
     // 인터랙티브 이벤트 타일
     // ════════════════════════════════════════════════════════════════
 
+    // ── 과거장: 조선 상식 퀴즈 ───────────────────────────────────────
+    if (tile.type === 'gwageo') {
+        UI.showModal(
+            '📜 과거 시험',
+            '5문제를 풀어 정답 수에 따라 보상을 받습니다!\n장원급제(5개) +50,000냥 / 합격(3~4개) +20,000냥\n낙방(1~2개) -5,000냥 / 파방(0개) -15,000냥',
+            () => showGwageo((correct) => {
+                let delta, title, msg;
+                if (correct >= 5)      { delta =  50000; title = '장원급제! 🎉'; msg = `5문제 전부 정답! +50,000냥`; }
+                else if (correct >= 3) { delta =  20000; title = '합격!';         msg = `${correct}문제 정답. +20,000냥`; }
+                else if (correct >= 1) { delta =  -5000; title = '낙방';          msg = `${correct}문제 정답. -5,000냥`; }
+                else                   { delta = -15000; title = '파방!';         msg = '전부 오답입니다. -15,000냥'; }
+                Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
+                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                Game.saveGameData();
+                updateBoardInfo();
+                UI.showModal(title, msg, () => { hasRolled = false; });
+            }),
+            () => { hasRolled = false; }
+        );
+        return;
+    }
+
     // ── 기연: 낚시 (2명 수집 완료) / 패 3장 뒤집기 ──────────────────
     if (tile.type === 'giyeon') {
         if (getCompletedCollectionCount() >= 2) {
-            UI.showModal('기연 — 낚시', '기연의 인연으로 낚시터에서 도전!\n90초 안에 6마리를 잡으면 +35,000냥, 실패하면 -8,000냥',
+            UI.showModal('기연 — 낚시', '기연의 인연으로 낚시터에서 도전!\n60초 안에 5마리를 잡으면 +35,000냥, 실패하면 -8,000냥',
                 () => showFishing(() => applyMgResult(true, 'fishing'), () => applyMgResult(false, 'fishing')),
                 () => { hasRolled = false; }
             );
@@ -793,6 +826,17 @@ function landOnTile(pos) {
         return;
     }
 
+    // ── 형옥: 테트리스 탈출 ──────────────────────────────────────────
+    if (tile.type === 'hyeongok') {
+        UI.showModal(
+            '⛓ 형옥에 갇혔습니다!',
+            '관아에 잡혀 형옥에 투옥됐습니다.\n테트리스로 6줄을 제거해 탈출하면 +40,000냥\n실패하면 -8,000냥',
+            () => showTetris(() => applyMgResult(true, 'tetris'), () => applyMgResult(false, 'tetris')),
+            () => { hasRolled = false; }
+        );
+        return;
+    }
+
     // ── 관아: 수도쿠 (5명 수집 완료) / 납세·뇌물 ───────────────────
     if (tile.type === 'gwana') {
         if (getCompletedCollectionCount() >= 5) {
@@ -890,6 +934,70 @@ function landOnTile(pos) {
         return;
     }
 
+    // ── 객주: 예치금 저축 + 이자율 도박 ──────────────────────────────
+    if (tile.type === 'gaekju') {
+        if (gaekjuDeposit) {
+            // 재방문 — 즉시 정산
+            const { amount, grade } = gaekjuDeposit;
+            gaekjuDeposit = null;
+            let multiplier, won = true;
+            if (grade === 'safe') {
+                multiplier = 1.3;
+            } else if (grade === 'normal') {
+                won = Math.random() < 0.7;
+                multiplier = won ? 1.6 : 0.8;
+            } else {
+                won = Math.random() < 0.5;
+                multiplier = won ? 2.0 : 0.5;
+            }
+            const payout = Math.floor(amount * multiplier);
+            const delta = payout - amount;
+            Game.setPlayerMoney(Math.max(0, Game.playerMoney + payout));
+            UI.updateTotalMoneyDisplay(Game.playerMoney);
+            Game.saveGameData();
+            updateBoardInfo();
+            const sign = delta >= 0 ? '+' : '';
+            UI.showModal(
+                won ? '💰 객주 — 정산 완료!' : '💸 객주 — 손실 발생',
+                `예치금 ${amount.toLocaleString()}냥 → ${payout.toLocaleString()}냥 회수\n(${sign}${delta.toLocaleString()}냥)`,
+                () => { hasRolled = false; }
+            );
+            return;
+        }
+
+        // 예치 없음 — 등급 + 금액 선택
+        showChoiceModal(
+            '객주',
+            '냥을 맡기고 다시 방문하면 이자를 붙여 정산합니다.\n등급을 선택하세요.',
+            [
+                {
+                    label: '🟢 안전 예치',
+                    subtext: '확정 +30% 이자 | 10,000 / 20,000 / 30,000냥',
+                    highlight: true,
+                    callback: () => openDepositAmountModal('safe'),
+                },
+                {
+                    label: '🟡 보통 예치',
+                    subtext: '70% → ×1.6 | 30% → ×0.8',
+                    callback: () => openDepositAmountModal('normal'),
+                },
+                {
+                    label: '🔴 고위험 예치',
+                    subtext: '50% → ×2.0 | 50% → ×0.5',
+                    danger: true,
+                    callback: () => openDepositAmountModal('high'),
+                },
+                {
+                    label: '↩ 그냥 지나침',
+                    subtext: '',
+                    callback: () => { hasRolled = false; },
+                },
+            ],
+            { icon: '💰' }
+        );
+        return;
+    }
+
     // ── 온천: 벽돌깨기 (4명 수집 완료) / 탕 3종 선택 ────────────────
     if (tile.type === 'oncheon') {
         if (getCompletedCollectionCount() >= 4) {
@@ -969,6 +1077,48 @@ function landOnTile(pos) {
  * choices: [{ label, subtext?, callback, danger?, highlight? }]
  * opts: { icon? }
  */
+function openDepositAmountModal(grade) {
+    const gradeDesc = grade === 'safe'
+        ? '안전 등급 — 확정 ×1.3'
+        : grade === 'normal'
+            ? '보통 등급 — 70%: ×1.6 / 30%: ×0.8'
+            : '고위험 등급 — 50%: ×2.0 / 50%: ×0.5';
+
+    const amounts = [10000, 20000, 30000];
+    const choices = amounts
+        .filter(a => Game.playerMoney >= a)
+        .map(a => ({
+            label: `${a.toLocaleString()}냥 예치`,
+            subtext: grade === 'safe'
+                ? `+${Math.floor(a * 0.3).toLocaleString()}냥 확정 이자`
+                : grade === 'normal'
+                    ? `기대 수익: +${Math.floor(a * 0.6 * 0.7 - a * 0.2 * 0.3).toLocaleString()}냥`
+                    : `성공 시 +${a.toLocaleString()}냥 / 실패 시 -${Math.floor(a * 0.5).toLocaleString()}냥`,
+            highlight: true,
+            callback: () => {
+                Game.setPlayerMoney(Game.playerMoney - a);
+                UI.updateTotalMoneyDisplay(Game.playerMoney);
+                Game.saveGameData();
+                updateBoardInfo();
+                gaekjuDeposit = { amount: a, grade };
+                UI.showModal('객주 예치 완료', `${a.toLocaleString()}냥을 맡겼습니다.\n다시 방문하면 정산됩니다.`, () => { hasRolled = false; });
+            },
+        }));
+
+    if (choices.length === 0) {
+        UI.showModal('객주', '예치할 냥이 부족합니다. (최소 10,000냥)', () => { hasRolled = false; });
+        return;
+    }
+
+    choices.push({
+        label: '↩ 뒤로',
+        subtext: '',
+        callback: () => { hasRolled = false; },
+    });
+
+    showChoiceModal('객주 — 예치 금액 선택', gradeDesc, choices, { icon: '💰' });
+}
+
 function showChoiceModal(title, desc, choices, opts = {}) {
     const overlay = document.createElement('div');
     overlay.className = 'bm-overlay';

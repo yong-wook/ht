@@ -361,7 +361,9 @@ h3 {
     border-radius: 20px;
     padding: 36px 48px;
     box-shadow: 0 0 40px rgba(150, 50, 255, 0.4);
-    min-width: 420px;
+    min-width: min(420px, 90vw);
+    max-height: 95vh;
+    overflow-y: auto;
 }
 
 #highlow-inner h2 {
@@ -646,6 +648,57 @@ h3 {
 .tile-dobakjang    { background: rgba(28,8,45,0.92);   border-color: rgba(180,100,255,0.55);}
 .tile-bangnanggaek { background: rgba(12,18,30,0.92);  border-color: rgba(110,145,195,0.4); }
 .tile-bobusang     { background: rgba(32,18,8,0.92);   border-color: rgba(195,145,70,0.45); }
+.tile-gaekju       { background: rgba(8,28,18,0.92);   border-color: rgba(60,200,120,0.45); }
+.tile-hyeongok     { background: rgba(18,10,8,0.92);   border-color: rgba(160,100,60,0.5);  }
+.tile-gwageo       { background: rgba(10,18,28,0.92);  border-color: rgba(80,140,220,0.5);  }
+
+.gwageo-question {
+    font-size: 1.05em;
+    font-weight: 600;
+    color: #eee;
+    text-align: center;
+    margin: 12px 0 16px;
+    line-height: 1.5;
+}
+.gwageo-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.gwageo-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: #ddd;
+    font-size: 0.95em;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s, border-color 0.15s;
+}
+.gwageo-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(255,255,255,0.3);
+}
+.gwageo-btn:disabled { cursor: default; }
+.gwageo-num {
+    font-size: 1.1em;
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+.gwageo-correct {
+    background: rgba(40,180,80,0.3) !important;
+    border-color: rgba(60,220,100,0.7) !important;
+    color: #7ef7a0 !important;
+}
+.gwageo-wrong {
+    background: rgba(200,50,50,0.3) !important;
+    border-color: rgba(240,80,80,0.7) !important;
+    color: #f99 !important;
+}
 
 /* ══════════════════════════════════════════════════════════
    슬라이드 퍼즐
@@ -975,6 +1028,8 @@ h3 {
     padding: 28px 30px;
     max-width: 460px;
     width: 90vw;
+    max-height: 95vh;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1574,6 +1629,8 @@ h3 {
     border-radius: 14px;
     padding: clamp(16px, 2.5vw, 28px);
     max-width: min(680px, 90vw);
+    max-height: 95vh;
+    overflow-y: auto;
     width: 90%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 40px rgba(90, 40, 140, 0.2);
     animation: charPanelIn 0.18s ease;
@@ -3992,4 +4049,198 @@ h3 {
     0%   { transform: translateY(-30px) rotate(0deg) scale(1);   opacity: 1; }
     80%  { opacity: 1; }
     100% { transform: translateY(105vh) rotate(640deg) scale(0.6); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   모바일 가로 최적화 — Galaxy S23 등 phone landscape (≤500px 높이)
+   ─ 기존 landscape 768px 쿼리 위에 추가 제약
+═══════════════════════════════════════════════════════════════ */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+
+    /* ── 상단 HUD ───────────────────────────────────────────── */
+    #player-total-money-container {
+        font-size: 0.7em;
+        padding: 3px 7px;
+        top: 4px;
+        right: 6px;
+    }
+    .audio-controls { top: 4px; left: 6px; }
+    .audio-panel-toggle-btn { width: 26px; height: 26px; font-size: 0.85em; }
+
+    /* ── 보드 컨테이너 ─────────────────────────────────────── */
+    #board-container {
+        padding: 36px 6px 4px;
+        align-items: center;
+        overflow: hidden;
+        min-height: 0;
+        height: 100vh;
+    }
+
+    /* ── 보드 그리드 타일 크기 ─────────────────────────────── */
+    /* height가 bottleneck: 4×tc + 3×ts + 14 ≤ 360-40=320px
+       tc≈44px, ts≈36px → 4×44+3×36+14=298px  ✓              */
+    #board-grid {
+        --tc: clamp(44px, min(8.5vw, 11vh), 90px);
+        --ts: clamp(36px, min(7vw,  9vh),   74px);
+    }
+
+    /* 타일 아이콘·텍스트 축소 */
+    .tile-icon      { font-size: clamp(0.9em,  2vmin, 1.5em); }
+    .tile-name      { font-size: clamp(0.5em,  0.9vmin, 0.8em); }
+    .tile-char-name { font-size: clamp(0.45em, 0.85vmin, 0.75em); }
+    .tile-hearts-row{ font-size: clamp(0.4em,  0.8vmin, 0.65em); }
+
+    /* ── 보드 중앙 UI ──────────────────────────────────────── */
+    #board-center { gap: clamp(3px, 0.8vh, 6px); }
+
+    .die {
+        width:  clamp(36px, 6vmin, 56px);
+        height: clamp(36px, 6vmin, 56px);
+        font-size: clamp(1.3em, 2.8vmin, 2em);
+    }
+    #board-roll-btn {
+        padding: clamp(5px, 1vh, 8px) clamp(10px, 1.8vw, 18px);
+        font-size: clamp(0.82em, 1.4vmin, 1.05em);
+    }
+    #board-money-display { font-size: clamp(0.85em, 1.4vmin, 1.1em); }
+    #board-income-timer  {
+        font-size: clamp(0.62em, 1.1vmin, 0.85em);
+        padding: 2px 6px;
+        margin-top: 1px;
+    }
+    #board-dice-result   { font-size: clamp(0.65em, 1.1vmin, 0.85em); min-height: 0.8em; }
+    #board-levelup-btn   { font-size: clamp(0.58em, 1vmin, 0.8em); padding: 2px 6px; }
+    #board-level-display { font-size: clamp(0.6em, 1vmin, 0.8em); }
+    #board-pos-display   { font-size: clamp(0.62em, 1.1vmin, 0.85em); }
+    #board-level-row     { margin-top: 2px; }
+    #board-dice-area     { gap: clamp(6px, 1.2vmin, 14px); }
+
+    /* ── 고스톱 카드판 ─────────────────────────────────────── */
+    .card {
+        width: 9.5vh;
+        height: calc(9.5vh * 1.6);
+        margin: 1px;
+    }
+    .acquired-group-cards .card {
+        width: 5.5vh;
+        height: calc(5.5vh * 1.6);
+    }
+    .hand-area  { width: 19vw; padding: 4px; min-width: 0; }
+    .center-area { width: 52vw; padding: 4px 0; }
+    h2 { font-size: 0.85em; margin-bottom: 3px; }
+    h3 { font-size: 0.78em; margin-bottom: 3px; }
+    .acquired-group h4 { font-size: 9px; margin: 1px 0; }
+
+    #go-button,
+    #stop-button {
+        min-height: 44px;
+        padding: 11px 16px;
+        font-size: 13px;
+    }
+
+    /* ── 하이로우 ──────────────────────────────────────────── */
+    #highlow-inner {
+        padding: 14px 20px;
+        gap: 10px;
+    }
+    #highlow-inner h2 { font-size: 1.1em; }
+    .hl-card {
+        width: clamp(52px, 9vw, 80px);
+        height: clamp(74px, 13vw, 116px);
+    }
+    #hl-cards { gap: 14px; }
+    #hl-buttons { gap: 10px; }
+    #hl-high-btn, #hl-low-btn {
+        padding: 10px 20px;
+        font-size: 1em;
+        min-height: 44px;
+    }
+
+    /* ── 미니게임 오버레이 (bm-*) ──────────────────────────── */
+    .bm-overlay {
+        align-items: flex-start;
+        overflow-y: auto;
+        padding: 4px 0 8px;
+    }
+    .bm-box {
+        padding: 12px 14px;
+        gap: 8px;
+        max-height: none;   /* 오버레이 자체가 스크롤하므로 제거 */
+    }
+    .bm-title   { font-size: 0.95em; margin: 0; }
+    .mg-hint    { font-size: 0.7em; margin: 0; }
+    .mg-info-row{ font-size: 0.78em; }
+
+    /* Breakout/낚시: CSS 표시 크기 제한 (좌표 매핑은 getBoundingClientRect 기반이므로 안전)
+       Tetris: 키보드 조작이므로 스크롤로 표시 (크기 유지) */
+    #mg-brk-canvas {
+        max-width: 90vw;
+        max-height: 78vh;
+        width: auto !important;
+        height: auto !important;
+    }
+    #mg-fishing-canvas {
+        max-width: 92vw;
+        height: auto !important;
+    }
+
+    /* ── 캐릭터 패널 ───────────────────────────────────────── */
+    #char-panel-content {
+        flex-direction: column;
+        max-height: 94vh;
+        overflow-y: auto;
+        max-width: min(500px, 94vw);
+        gap: 10px;
+        padding: 12px 14px;
+    }
+    #char-panel-img-wrap {
+        display: flex;
+        justify-content: center;
+    }
+    #char-panel-img {
+        width:  clamp(70px, 17vh, 130px);
+        height: clamp(105px, 25.5vh, 195px);
+    }
+    #char-panel-dialogue { padding: 6px 10px; font-size: 0.82em; }
+
+    /* ── 스테이지 캐릭터 선택 ──────────────────────────────── */
+    .scene-char-frame {
+        width:  clamp(52px, 8vw, 88px);
+        height: clamp(74px, 11.4vw, 125px);
+    }
+    .scene-char-name  { font-size: clamp(0.55em, 0.9vw, 0.75em); }
+    .scene-char-hearts .heart-full,
+    .scene-char-hearts .heart-empty { font-size: clamp(0.38em, 0.6vw, 0.5em); }
+
+    /* ── 모달 공통 ─────────────────────────────────────────── */
+    .modal-content     { max-height: 88vh; overflow-y: auto; padding: 14px; }
+    .custom-modal-content { padding: 16px; }
+
+    /* ── 쇼타임 버튼 ───────────────────────────────────────── */
+    #showtime-return-button,
+    #showtime-respin-button {
+        min-height: 44px;
+        padding: 10px 16px;
+        font-size: 0.88em;
+    }
+
+    /* ── 슬라이드 퍼즐 ─────────────────────────────────────── */
+    #slidepuzzle-container { gap: 8px; }
+    #sp-title { font-size: 1em; margin-bottom: 6px; }
+    #sp-body  { gap: clamp(8px, 2vw, 16px); }
+
+    /* ── 지뢰찾기 ───────────────────────────────────────────── */
+    .ms-grid {
+        grid-template-columns: repeat(7, 32px);
+        grid-template-rows: repeat(7, 32px);
+    }
+    .ms-cell { width: 32px; height: 32px; font-size: 0.88em; }
+
+    /* ── 소매치기잡기 ───────────────────────────────────────── */
+    .pp-grid {
+        grid-template-columns: repeat(4, 56px);
+        grid-template-rows: repeat(3, 56px);
+        gap: 6px;
+    }
+    .pp-cell { width: 56px; height: 56px; font-size: 1.7em; }
 }

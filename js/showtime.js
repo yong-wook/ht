@@ -216,6 +216,8 @@ export function showShowtime(callback, stage, selectedImagePath, respinCallback,
     skipToExplore         = alreadyOwned;
     currentGameMode       = alreadyOwned ? 'skip' : gameMode;
 
+    showtimeImage.onload = null;
+
     if (selectedImagePath) {
         showtimeImage.src = selectedImagePath;
     } else if (stage && stage.showtimeImage) {
