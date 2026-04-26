@@ -2417,6 +2417,72 @@ h3 {
         overflow: hidden;
     }
 
+    /* ── 보드 컨테이너: 세로 모드에서 가로 패딩 제거 ── */
+    #board-container {
+        padding: 40px 0 10px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        align-items: flex-start;
+        justify-content: center;
+    }
+
+    /* ── 보드 그리드: 7열이 화면 폭에 딱 맞도록 타일 축소 ── */
+    #board-grid {
+        --ts: calc((100vw - 16px) / 7);
+        --tc: calc(var(--ts) * 1.35);
+    }
+
+    /* ── 보드 중앙 간격 축소 ── */
+    #board-center {
+        gap: 4px;
+        padding: 4px;
+    }
+    .die {
+        width:  clamp(36px, 12vw, 56px);
+        height: clamp(36px, 12vw, 56px);
+        font-size: clamp(1.4em, 5vw, 2.4em);
+    }
+    #board-roll-btn {
+        padding: 8px 14px;
+        font-size: 0.95em;
+    }
+    #board-money-display  { font-size: 0.88em; }
+    #board-income-timer   { font-size: 0.72em; padding: 2px 7px; margin-top: 0; }
+    #board-dice-result    { font-size: 0.72em; min-height: 0; }
+    #board-level-display  { font-size: 0.68em; }
+    #board-levelup-btn    { font-size: 0.65em; padding: 3px 6px; }
+    #board-pos-display    { font-size: 0.7em; }
+    #board-level-row      { margin-top: 0; gap: 4px; }
+
+    /* 타일 내용 글자 축소 */
+    .tile-icon      { font-size: clamp(0.8em, 3.5vw, 1.4em); }
+    .tile-name      { font-size: clamp(0.42em, 1.8vw, 0.75em); }
+    .tile-char-name { font-size: clamp(0.38em, 1.6vw, 0.7em); }
+    .tile-hearts-row { font-size: clamp(0.3em, 1.2vw, 0.6em); }
+
+    /* ── 캐릭터 패널: 세로 레이아웃 ── */
+    #char-panel-content {
+        flex-direction: column;
+        max-height: 90vh;
+        overflow-y: auto;
+        max-width: 94vw;
+        gap: 8px;
+        padding: 12px;
+    }
+    #char-panel-img-wrap {
+        display: flex;
+        justify-content: center;
+    }
+    #char-panel-img {
+        width: clamp(70px, 16vw, 110px);
+        height: clamp(105px, 24vw, 165px);
+    }
+    #char-panel-dialogue {
+        flex: none;
+        font-size: 0.82em;
+        padding: 6px 10px;
+    }
+
     /* ── 게임 컨테이너: 화면 전체를 flex 열로 채움 ── */
     #game-container {
         display: flex;
