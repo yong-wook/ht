@@ -2609,19 +2609,23 @@ h3 {
 
     #player-hand > h2 { display: none; }
 
-    /* 손패 카드 한 줄 가로 스크롤 */
+    /* 손패 카드: 2줄 줄바꿈 배치 (가로 스크롤 제거 → 모든 카드 터치 가능) */
     #player-hand > .card-container {
         display: flex;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        overflow-y: hidden;
+        flex-wrap: wrap;
+        overflow: hidden;
         justify-content: flex-start;
+        align-content: flex-start;
         gap: 2px;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+        padding: 1px;
     }
-    #player-hand > .card-container::-webkit-scrollbar { display: none; }
-    #player-hand > .card-container .card { flex-shrink: 0; }
+    /* 한 줄에 6장: 손패 10장이면 6+4로 2줄 표시 */
+    #player-hand > .card-container > .card {
+        width: 15vw;
+        height: calc(15vw * 1.6);
+        margin: 0;
+        flex-shrink: 0;
+    }
 
     /* ── 획득한 패: 가로 스크롤 띠 ── */
     .acquired-cards {
