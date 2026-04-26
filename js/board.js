@@ -320,11 +320,13 @@ function onRollClick() {
 
     // 굴리기 비용 확인
     if (Game.playerMoney < ROLL_COST) {
-        UI.showModal(
-            '자금 부족',
-            `주사위를 굴리려면 ${ROLL_COST.toLocaleString()}냥이 필요합니다.\n수입(${INCOME_INTERVAL_SEC}초마다 +${INCOME_AMOUNT.toLocaleString()}냥)을 기다리세요.`,
-            () => {}
-        );
+        showAdModal(() => {
+            Game.setPlayerMoney(Game.playerMoney + 10000);
+            UI.updateTotalMoneyDisplay(Game.playerMoney);
+            Game.saveGameData();
+            updateBoardInfo();
+            UI.showModal('💰 충전 완료!', '광고 시청으로 10,000냥을 받았습니다!', () => {});
+        });
         return;
     }
 
@@ -1092,6 +1094,89 @@ function openDepositAmountModal(grade) {
     }
 
     showChoiceModal('객주 — 예치 금액 선택', gradeDesc, choices, { icon: '💰' });
+}
+
+// ── 목업 광고 모달 ────────────────────────────────────────────────────────────
+function showAdModal(onComplete) {
+    const AD_DURATION = 5; // 초
+
+    const overlay = document.createElement('div');
+    overlay.className = 'bm-overlay';
+
+    const box = document.createElement('div');
+    box.className = 'bm-box';
+    box.style.cssText = 'max-width:340px; text-align:center;';
+    box.innerHTML = `
+        <div style="font-size:0.75em; color:rgba(255,255,255,0.45); margin-bottom:6px; text-align:right;">광고</div>
+        <div id="ad-mock-content" style="
+            background: linear-gradient(135deg, #1a1a4e, #3a0a5e);
+            border-radius: 10px;
+            padding: 28px 20px;
+            margin-bottom: 14px;
+            border: 1px solid rgba(180,100,255,0.4);
+        ">
+            <div style="font-size:2.6em; margin-bottom:10px;">🃏</div>
+            <div style="font-size:1.2em; font-weight:bold; color:#fff; margin-bottom:6px;">천하화투 온라인</div>
+            <div style="font-size:0.85em; color:rgba(255,220,180,0.85); margin-bottom:12px;">지금 바로 다운로드하고<br>신규 유저 보너스 받기!</div>
+            <div style="
+                display:inline-block;
+                background:#ff6b35;
+                color:#fff;
+                padding:6px 18px;
+                border-radius:20px;
+                font-size:0.85em;
+                font-weight:bold;
+            ">무료 다운로드 ▶</div>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:center; gap:10px;">
+            <div id="ad-timer-bar" style="
+                flex:1; height:6px;
+                background:rgba(255,255,255,0.15);
+                border-radius:3px; overflow:hidden;
+            "><div id="ad-timer-fill" style="
+                height:100%; width:0%;
+                background: linear-gradient(90deg,#f7c948,#ff8c00);
+                transition: width 0.1s linear;
+            "></div></div>
+            <button id="ad-skip-btn" style="
+                padding:6px 14px; border-radius:6px;
+                background:rgba(255,255,255,0.15);
+                border:1px solid rgba(255,255,255,0.3);
+                color:rgba(255,255,255,0.4);
+                font-size:0.82em; cursor:default;
+                pointer-events:none;
+            ">닫기 (<span id="ad-countdown">${AD_DURATION}</span>)</button>
+        </div>
+    `;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('bm-visible'));
+
+    const fill    = box.querySelector('#ad-timer-fill');
+    const countEl = box.querySelector('#ad-countdown');
+    const skipBtn = box.querySelector('#ad-skip-btn');
+
+    let elapsed = 0;
+    const iv = setInterval(() => {
+        elapsed += 0.1;
+        fill.style.width = `${Math.min(100, elapsed / AD_DURATION * 100)}%`;
+        const remaining = Math.ceil(AD_DURATION - elapsed);
+        countEl.textContent = remaining > 0 ? remaining : 0;
+
+        if (elapsed >= AD_DURATION) {
+            clearInterval(iv);
+            skipBtn.textContent = '✕ 닫기';
+            skipBtn.style.color = '#fff';
+            skipBtn.style.background = 'rgba(80,200,100,0.35)';
+            skipBtn.style.borderColor = 'rgba(80,200,100,0.6)';
+            skipBtn.style.cursor = 'pointer';
+            skipBtn.style.pointerEvents = 'auto';
+            skipBtn.onclick = () => {
+                overlay.classList.remove('bm-visible');
+                setTimeout(() => { overlay.remove(); onComplete(); }, 220);
+            };
+        }
+    }, 100);
 }
 
 function showChoiceModal(title, desc, choices, opts = {}) {
