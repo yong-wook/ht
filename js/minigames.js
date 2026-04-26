@@ -1,6 +1,7 @@
 // js/minigames.js
 // 보드 타일 컬렉션 해금 미니게임 8종
 import * as Game from './game.js';
+import { audioManager, SFX } from './audio.js';
 
 function buildOverlay() {
     const ov = document.createElement('div');
@@ -602,13 +603,14 @@ function _startBreakout(onWin, onLose, bgImg) {
     // 공 하나 업데이트. 반환값: true=아웃(제거), 'win'=전체 벽돌 제거
     function updateBall(ball) {
         ball.x+=ball.vx; ball.y+=ball.vy;
-        if (ball.x-BALL_R<0){ball.x=BALL_R;ball.vx=Math.abs(ball.vx);}
-        if (ball.x+BALL_R>W){ball.x=W-BALL_R;ball.vx=-Math.abs(ball.vx);}
-        if (ball.y-BALL_R<0){ball.y=BALL_R;ball.vy=Math.abs(ball.vy);}
+        if (ball.x-BALL_R<0){ball.x=BALL_R;ball.vx=Math.abs(ball.vx);audioManager.playSfx(SFX.CARD_FLIP);}
+        if (ball.x+BALL_R>W){ball.x=W-BALL_R;ball.vx=-Math.abs(ball.vx);audioManager.playSfx(SFX.CARD_FLIP);}
+        if (ball.y-BALL_R<0){ball.y=BALL_R;ball.vy=Math.abs(ball.vy);audioManager.playSfx(SFX.CARD_FLIP);}
         if (ball.y+BALL_R>=PAD_Y && ball.y+BALL_R<=PAD_Y+PAD_H+5 &&
             ball.x>=padX-4 && ball.x<=padX+PAD_W+4 && ball.vy>0) {
             ball.vx=((ball.x-(padX+PAD_W/2))/(PAD_W/2))*5;
             ball.vy=-Math.abs(ball.vy); ball.y=PAD_Y-BALL_R;
+            audioManager.playSfx(SFX.CARD_PLAY);
         }
         for (const b of bricks) {
             if (!b.alive) continue;
@@ -616,6 +618,7 @@ function _startBreakout(onWin, onLose, bgImg) {
                 ball.y+BALL_R>b.y && ball.y-BALL_R<b.y+BRICK_H) {
                 b.alive=false; bricksLeft--;
                 leftEl.textContent=`벽돌: ${bricksLeft}`;
+                audioManager.playSfx(SFX.CARD_MATCH);
                 if (Math.random() < ITEM_CHANCE)
                     items.push({ x:b.x+BRICK_W/2, y:b.y+BRICK_H/2, vy:ITEM_SPEED });
                 const ox=Math.min(ball.x+BALL_R-b.x,b.x+BRICK_W-(ball.x-BALL_R));
@@ -638,6 +641,7 @@ function _startBreakout(onWin, onLose, bgImg) {
         for (let i=lost.length-1; i>=0; i--) balls.splice(lost[i],1);
         if (balls.length===0) {
             lives--; livesEl.textContent=`❤️ × ${lives}`;
+            audioManager.playSfx(SFX.SHAKE);
             if (lives<=0) { end(false); return; }
             balls=[{x:W/2, y:H/2-40, vx:3, vy:-3.8}];
             items=[];
@@ -651,6 +655,7 @@ function _startBreakout(onWin, onLose, bgImg) {
             if (it.y+ITEM_R>=PAD_Y && it.y-ITEM_R<=PAD_Y+PAD_H &&
                 it.x>=padX-4 && it.x<=padX+PAD_W+4) {
                 // 패들이 아이템 캐치 → 새 공 추가
+                audioManager.playSfx(SFX.COIN);
                 const angle=(Math.random()*0.8-0.4)-Math.PI/2;
                 const spd=3.8;
                 balls.push({x:padX+PAD_W/2, y:PAD_Y-BALL_R-1,
@@ -666,6 +671,7 @@ function _startBreakout(onWin, onLose, bgImg) {
         gameOver=true;
         cancelAnimationFrame(animId);
         draw();
+        audioManager.playSfx(won ? SFX.WIN : SFX.BOMB);
         setTimeout(()=>closeOverlay(ov, won?onWin:onLose), 800);
     }
 
@@ -1295,82 +1301,143 @@ export function showArrowDodge(onWin, onLose) {
     loop();
 }
 
-// ─── 8. 소매치기잡기 (Pickpocket) ─────────────────────────────────────────────
+// ─── 8. 소매치기 포위 작전 (Surround the Thief) ──────────────────────────────
 export function showPickpocket(onWin, onLose) {
-    const ROWS=3, COLS=4, TARGET=10, TIME_LIMIT=50;
+    const GRID = 7;
+    const MAX_TURNS = 20;
+    const DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
 
-    const ov=buildOverlay();
-    const box=document.createElement('div');
-    box.className='bm-box mg-box';
-    box.innerHTML=`
-        <h3 class="bm-title">👮 소매치기잡기</h3>
-        <p class="bm-desc">소매치기(🦹)를 잡으세요! 시민(🧑)을 잡으면 -1점</p>
+    const ov = buildOverlay();
+    const box = document.createElement('div');
+    box.className = 'bm-box mg-box';
+    box.innerHTML = `
+        <h3 class="bm-title">👮 소매치기 포위 작전</h3>
+        <p class="bm-desc">🚧 바리케이드로 도둑(🦹)을 포위하세요!<br>초록 테두리 칸으로 탈출하면 실패!</p>
         <div class="mg-info-row">
-            <span id="pp-score">잡기: 0 / ${TARGET}</span>
-            <span id="pp-timer">⏱ ${TIME_LIMIT}</span>
+            <span id="pp-turns">⏳ 남은 턴: ${MAX_TURNS}</span>
+            <span id="pp-msg">빈 칸 클릭 → 바리케이드 설치</span>
         </div>
-        <div class="pp-grid" id="pp-grid"></div>
+        <div class="pp-hunt-grid" id="pp-hunt-grid"></div>
     `;
     ov.appendChild(box);
 
-    const gridEl  = box.querySelector('#pp-grid');
-    const scoreEl = box.querySelector('#pp-score');
-    const timerEl = box.querySelector('#pp-timer');
+    const gridEl  = box.querySelector('#pp-hunt-grid');
+    const turnsEl = box.querySelector('#pp-turns');
+    const msgEl   = box.querySelector('#pp-msg');
 
-    let catches=0, timeLeft=TIME_LIMIT, gameOver=false;
-    const cells=Array.from({length:ROWS*COLS},()=>({active:false,type:null,tid:null}));
+    let thiefR = Math.floor(GRID / 2), thiefC = Math.floor(GRID / 2);
+    let turnsLeft = MAX_TURNS;
+    let gameOver = false;
+    let thiefJustMoved = false;
+    const blocked = Array.from({length: GRID}, () => new Array(GRID).fill(false));
 
-    function render() {
-        gridEl.innerHTML='';
-        cells.forEach((cell,i)=>{
-            const el=document.createElement('div');
-            el.className='pp-cell';
-            if (cell.active) {
-                el.classList.add(cell.type==='thief'?'pp-thief':'pp-citizen');
-                el.textContent=cell.type==='thief'?'🦹':'🧑';
-                el.addEventListener('click',()=>{
-                    if (gameOver||!cell.active) return;
-                    if (cell.type==='thief') {
-                        clearTimeout(cell.tid); cell.active=false;
-                        scoreEl.textContent=`잡기: ${++catches} / ${TARGET}`;
-                        render(); if (catches>=TARGET) end(true);
-                    } else {
-                        catches=Math.max(0,catches-1);
-                        scoreEl.textContent=`잡기: ${catches} / ${TARGET}`;
-                        el.style.background='#ff4444';
-                        setTimeout(()=>render(),300);
-                    }
-                });
+    const isBorder = (r, c) => r === 0 || r === GRID-1 || c === 0 || c === GRID-1;
+
+    // BFS: 도둑 위치에서 가장자리(탈출구)까지의 첫 이동 칸 반환. null이면 포위됨.
+    function findEscapeStep(fromR, fromC) {
+        const queue = [[fromR, fromC, null]];
+        const visited = Array.from({length: GRID}, () => new Array(GRID).fill(false));
+        visited[fromR][fromC] = true;
+        while (queue.length) {
+            const [r, c, first] = queue.shift();
+            if (isBorder(r, c) && !(r === fromR && c === fromC)) return first;
+            for (const [dr, dc] of DIRS) {
+                const nr = r+dr, nc = c+dc;
+                if (nr >= 0 && nr < GRID && nc >= 0 && nc < GRID
+                    && !visited[nr][nc] && !blocked[nr][nc]) {
+                    visited[nr][nc] = true;
+                    queue.push([nr, nc, first ?? [nr, nc]]);
+                }
             }
-            gridEl.appendChild(el);
-        });
+        }
+        return null;
     }
 
-    function spawnOne() {
+    // 초기 랜덤 바리케이드 8개 배치 (도둑 탈출경로 보장)
+    const interior = [];
+    for (let r = 1; r < GRID-1; r++)
+        for (let c = 1; c < GRID-1; c++)
+            if (!(r === thiefR && c === thiefC)) interior.push([r, c]);
+    interior.sort(() => Math.random() - 0.5);
+    let placed = 0;
+    for (const [r, c] of interior) {
+        if (placed >= 8) break;
+        blocked[r][c] = true;
+        if (!findEscapeStep(thiefR, thiefC)) { blocked[r][c] = false; continue; }
+        placed++;
+    }
+
+    function render() {
+        gridEl.innerHTML = '';
+        for (let r = 0; r < GRID; r++) {
+            for (let c = 0; c < GRID; c++) {
+                const el = document.createElement('div');
+                el.className = 'pp-hunt-cell';
+                const isThief = (r === thiefR && c === thiefC);
+                if (isThief) {
+                    el.classList.add('pp-hunt-thief');
+                    if (thiefJustMoved) el.classList.add('pp-hunt-moved');
+                    el.textContent = '🦹';
+                } else if (blocked[r][c]) {
+                    el.classList.add('pp-hunt-block');
+                    el.textContent = '🚧';
+                } else if (isBorder(r, c)) {
+                    el.classList.add('pp-hunt-exit');
+                } else {
+                    el.classList.add('pp-hunt-empty');
+                    el.addEventListener('click', () => playerMove(r, c));
+                }
+                gridEl.appendChild(el);
+            }
+        }
+        thiefJustMoved = false;
+    }
+
+    function playerMove(r, c) {
         if (gameOver) return;
-        const empty=cells.map((c,i)=>c.active?null:i).filter(i=>i!==null);
-        if (!empty.length) return;
-        const i=empty[Math.floor(Math.random()*empty.length)];
-        const isThief=Math.random()<0.4;
-        cells[i]={active:true, type:isThief?'thief':'citizen',
-            tid:setTimeout(()=>{ cells[i].active=false; cells[i].tid=null; render(); }, isThief?1200:1800)
-        };
+        if (r === thiefR && c === thiefC) return;
+        if (blocked[r][c]) return;
+        if (isBorder(r, c)) return;
+
+        blocked[r][c] = true;
+        turnsLeft--;
+        turnsEl.textContent = `⏳ 남은 턴: ${turnsLeft}`;
+        audioManager.playSfx(SFX.CARD_PLAY);
+
+        // 바리케이드 설치 후 즉시 포위 체크
+        if (!findEscapeStep(thiefR, thiefC)) { render(); end(true); return; }
+
+        // 도둑 이동 (65% 최적경로, 35% 랜덤 인접 칸)
+        const optStep = findEscapeStep(thiefR, thiefC);
+        let nextPos;
+        if (Math.random() < 0.35) {
+            const adj = DIRS.map(([dr,dc])=>[thiefR+dr,thiefC+dc])
+                .filter(([nr,nc])=>nr>=0&&nr<GRID&&nc>=0&&nc<GRID&&!blocked[nr][nc]&&!isBorder(nr,nc));
+            nextPos = adj.length ? adj[Math.floor(Math.random()*adj.length)] : optStep;
+        } else {
+            nextPos = optStep;
+        }
+        [thiefR, thiefC] = nextPos;
+        thiefJustMoved = true;
+        audioManager.playSfx(SFX.CARD_FLIP);
+
+        if (isBorder(thiefR, thiefC)) { render(); end(false); return; }
+
+        // 이동 후 포위 체크
+        if (!findEscapeStep(thiefR, thiefC)) { render(); end(true); return; }
+
+        if (turnsLeft <= 0) { render(); end(false); return; }
         render();
     }
 
     function end(won) {
-        gameOver=true; clearInterval(timerIv); clearInterval(spawnIv);
-        cells.forEach(c=>{ if(c.tid) clearTimeout(c.tid); });
-        setTimeout(()=>closeOverlay(ov,won?onWin:onLose),700);
+        gameOver = true;
+        msgEl.textContent = won ? '🎉 포위 성공! 도둑을 잡았습니다!' : '💨 도둑이 탈출했습니다!';
+        turnsEl.textContent = `⏳ 남은 턴: ${turnsLeft}`;
+        audioManager.playSfx(won ? SFX.WIN : SFX.BOMB);
+        setTimeout(() => closeOverlay(ov, won ? onWin : onLose), 1400);
     }
 
-    const timerIv=setInterval(()=>{
-        if (gameOver) return;
-        timerEl.textContent=`⏱ ${--timeLeft}`;
-        if (timeLeft<=0) end(catches>=TARGET);
-    },1000);
-
-    const spawnIv=setInterval(()=>{ if(!gameOver) spawnOne(); },650);
     render();
 }
 

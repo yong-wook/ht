@@ -430,8 +430,7 @@ function landOnTile(pos) {
     if (tile.type === 'jangter') {
         if (getCompletedCollectionCount() >= 8) {
             UI.showModal('장터 — 소매치기잡기', '장터가 소란스럽습니다! 소매치기를 잡아라!\n50초 안에 10명을 잡으면 +35,000냥, 실패하면 -5,000냥',
-                () => showPickpocket(() => applyMgResult(true, 'pickpocket'), () => applyMgResult(false, 'pickpocket')),
-                () => { hasRolled = false; }
+                () => showPickpocket(() => applyMgResult(true, 'pickpocket'), () => applyMgResult(false, 'pickpocket'))
             );
             return;
         }
@@ -454,15 +453,14 @@ function landOnTile(pos) {
                     desc: '2번 연속으로 맞추면 25,000냥 획득!',
                     required: 2,
                 });
-            },
-            () => { hasRolled = false; }
+            }
         );
         return;
     }
 
     // ── 도박장: 룰렛 ─────────────────────────────────────────────────
     if (tile.type === 'dobakjang') {
-        UI.showModal('도박장', '도박장의 룰렛이 돌아가고 있습니다.\n운을 시험해보시겠습니까?',
+        UI.showModal('도박장', '도박장의 룰렛이 돌아가고 있습니다!\n룰렛이 강제로 돌아갑니다.',
             () => {
                 Roulette.showRoulette((item) => {
                     Roulette.hideRoulette();
@@ -487,8 +485,7 @@ function landOnTile(pos) {
                         UI.showModal('도박장 결과!', `✨ ${item.name} 획득!\n다음 고스톱 승부에서 적용됩니다.`, () => { hasRolled = false; });
                     }
                 });
-            },
-            () => { hasRolled = false; }
+            }
         );
         return;
     }
@@ -537,8 +534,7 @@ function landOnTile(pos) {
                         () => { hasRolled = false; }
                     );
                 });
-            },
-            () => { hasRolled = false; }
+            }
         );
         return;
     }
@@ -584,8 +580,7 @@ function landOnTile(pos) {
                     },
                     null, imagePath, null, null, false
                 );
-            },
-            () => { hasRolled = false; }
+            }
         );
         return;
     }
@@ -625,8 +620,7 @@ function landOnTile(pos) {
                 Game.saveGameData();
                 updateBoardInfo();
                 UI.showModal(title, msg, () => { hasRolled = false; });
-            }),
-            () => { hasRolled = false; }
+            })
         );
         return;
     }
@@ -635,8 +629,7 @@ function landOnTile(pos) {
     if (tile.type === 'giyeon') {
         if (getCompletedCollectionCount() >= 2) {
             UI.showModal('기연 — 낚시', '기연의 인연으로 낚시터에서 도전!\n60초 안에 5마리를 잡으면 +35,000냥, 실패하면 -8,000냥',
-                () => showFishing(() => applyMgResult(true, 'fishing'), () => applyMgResult(false, 'fishing')),
-                () => { hasRolled = false; }
+                () => showFishing(() => applyMgResult(true, 'fishing'), () => applyMgResult(false, 'fishing'))
             );
             return;
         }
@@ -666,8 +659,7 @@ function landOnTile(pos) {
     if (tile.type === 'nugang') {
         if (getCompletedCollectionCount() >= 1) {
             UI.showModal('누각 — 오목', '달밤의 누각에서 오목 고수가 도전해옵니다!\n5목을 완성하면 +50,000냥, 패배하면 -5,000냥',
-                () => showGomoku(() => applyMgResult(true, 'gomoku'), () => applyMgResult(false, 'gomoku')),
-                () => { hasRolled = false; }
+                () => showGomoku(() => applyMgResult(true, 'gomoku'), () => applyMgResult(false, 'gomoku'))
             );
             return;
         }
@@ -697,8 +689,7 @@ function landOnTile(pos) {
     if (tile.type === 'bobusang') {
         if (getCompletedCollectionCount() >= 6) {
             UI.showModal('보부상 — 지뢰찾기', '보부상이 위험한 내기를 겁니다!\n8개의 지뢰를 피해 모두 열면 +35,000냥, 지뢰를 밟으면 -5,000냥',
-                () => showMinesweeper(() => applyMgResult(true, 'minesweeper'), () => applyMgResult(false, 'minesweeper')),
-                () => { hasRolled = false; }
+                () => showMinesweeper(() => applyMgResult(true, 'minesweeper'), () => applyMgResult(false, 'minesweeper'))
             );
             return;
         }
@@ -732,8 +723,7 @@ function landOnTile(pos) {
     if (tile.type === 'bangnanggaek') {
         if (getCompletedCollectionCount() >= 7) {
             UI.showModal('방랑객 — 화살피하기', '방랑객이 위험한 내기를 겁니다!\n30초 동안 화살을 피하면 +40,000냥, 모두 맞으면 -8,000냥',
-                () => showArrowDodge(() => applyMgResult(true, 'arrowdodge'), () => applyMgResult(false, 'arrowdodge')),
-                () => { hasRolled = false; }
+                () => showArrowDodge(() => applyMgResult(true, 'arrowdodge'), () => applyMgResult(false, 'arrowdodge'))
             );
             return;
         }
@@ -831,8 +821,7 @@ function landOnTile(pos) {
         UI.showModal(
             '⛓ 형옥에 갇혔습니다!',
             '관아에 잡혀 형옥에 투옥됐습니다.\n테트리스로 6줄을 제거해 탈출하면 +40,000냥\n실패하면 -8,000냥',
-            () => showTetris(() => applyMgResult(true, 'tetris'), () => applyMgResult(false, 'tetris')),
-            () => { hasRolled = false; }
+            () => showTetris(() => applyMgResult(true, 'tetris'), () => applyMgResult(false, 'tetris'))
         );
         return;
     }
@@ -841,8 +830,7 @@ function landOnTile(pos) {
     if (tile.type === 'gwana') {
         if (getCompletedCollectionCount() >= 5) {
             UI.showModal('관아 — 수도쿠', '관아에서 두뇌 시험을 냅니다!\n9×9 수도쿠를 완성하면 +30,000냥, 포기하면 -5,000냥',
-                () => showSudoku(() => applyMgResult(true, 'sudoku'), () => applyMgResult(false, 'sudoku')),
-                () => { hasRolled = false; }
+                () => showSudoku(() => applyMgResult(true, 'sudoku'), () => applyMgResult(false, 'sudoku'))
             );
             return;
         }
@@ -889,8 +877,7 @@ function landOnTile(pos) {
     if (tile.type === 'jujak') {
         if (getCompletedCollectionCount() >= 3) {
             UI.showModal('주막 — 숫자야구', '주막 주인이 세 자리 숫자 내기를 제안합니다!\n7번 안에 맞추면 +30,000냥, 실패하면 -5,000냥',
-                () => showNumberBaseball(() => applyMgResult(true, 'baseball'), () => applyMgResult(false, 'baseball')),
-                () => { hasRolled = false; }
+                () => showNumberBaseball(() => applyMgResult(true, 'baseball'), () => applyMgResult(false, 'baseball'))
             );
             return;
         }
@@ -987,11 +974,6 @@ function landOnTile(pos) {
                     danger: true,
                     callback: () => openDepositAmountModal('high'),
                 },
-                {
-                    label: '↩ 그냥 지나침',
-                    subtext: '',
-                    callback: () => { hasRolled = false; },
-                },
             ],
             { icon: '💰' }
         );
@@ -1002,8 +984,7 @@ function landOnTile(pos) {
     if (tile.type === 'oncheon') {
         if (getCompletedCollectionCount() >= 4) {
             UI.showModal('온천 — 벽돌깨기', '온천 연회에서 벽돌깨기 대결!\n모든 벽돌을 깨면 +40,000냥, 실패하면 -8,000냥',
-                () => showBreakout(() => applyMgResult(true, 'breakout'), () => applyMgResult(false, 'breakout')),
-                () => { hasRolled = false; }
+                () => showBreakout(() => applyMgResult(true, 'breakout'), () => applyMgResult(false, 'breakout'))
             );
             return;
         }
@@ -1109,12 +1090,6 @@ function openDepositAmountModal(grade) {
         UI.showModal('객주', '예치할 냥이 부족합니다. (최소 10,000냥)', () => { hasRolled = false; });
         return;
     }
-
-    choices.push({
-        label: '↩ 뒤로',
-        subtext: '',
-        callback: () => { hasRolled = false; },
-    });
 
     showChoiceModal('객주 — 예치 금액 선택', gradeDesc, choices, { icon: '💰' });
 }
