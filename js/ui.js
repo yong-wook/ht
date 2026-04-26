@@ -256,6 +256,7 @@ export function updateStatusMessage(message) {
 export function showGoStopButtons(show) {
     goButton.style.display = show ? 'inline-block' : 'none';
     stopButton.style.display = show ? 'inline-block' : 'none';
+    document.getElementById('controls').classList.toggle('go-stop-active', show);
 }
 
 export function showResultModal(winner, finalScore, moneyWon, breakdown) {
