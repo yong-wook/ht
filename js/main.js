@@ -171,10 +171,12 @@ function enterShowtime(stage) {
 
     const offerAuction = () => {
         if (!nextBgId) { goToShowtime(false); return; }
-        const price = BG_AUCTION_PRICES[nextBgId - 1];
+        // 소지금의 50%~100% (배경 번호에 비례), 최소 1,000원
+        const pct = 0.50 + (nextBgId - 1) / 11 * 0.50;
+        const price = Math.max(1000, Math.round(Game.playerMoney * pct / 1000) * 1000);
         UI.showModal(
             '도전 실패',
-            `배경 No.${nextBgId}을(를) 획득하지 못했습니다.\n${price.toLocaleString()}원에 구매하시겠습니까?`,
+            `배경 No.${nextBgId}을(를) 획득하지 못했습니다.\n소지금의 ${Math.round(pct * 100)}%(${price.toLocaleString()}원)에 구매하시겠습니까?`,
             () => {
                 if (Game.deductPlayerMoney(price)) {
                     Game.saveGameData();
