@@ -100,7 +100,9 @@ const MG_REWARDS = {
 
 function applyMgResult(won, key) {
     const r = MG_REWARDS[key];
-    const delta = won ? r.win : -r.lose;
+    const win  = scaleMoney(r.win);
+    const lose = scaleMoney(r.lose);
+    const delta = won ? win : -lose;
     Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
     UI.updateTotalMoneyDisplay(Game.playerMoney);
     Game.saveGameData();
@@ -108,8 +110,8 @@ function applyMgResult(won, key) {
     UI.showModal(
         won ? '미니게임 승리! 🎉' : '미니게임 패배',
         won
-            ? `훌륭합니다! +${r.win.toLocaleString()}냥`
-            : `아쉽네요. -${r.lose.toLocaleString()}냥`,
+            ? `훌륭합니다! +${win.toLocaleString()}냥`
+            : `아쉽네요. -${lose.toLocaleString()}냥`,
         () => { hasRolled = false; }
     );
 }
@@ -140,17 +142,25 @@ function shuffle(arr) {
     return a;
 }
 
+// ── 유틸: 판돈 레벨 비례 금액 계산 ─────────────────────────────────────
+// 기준 레벨 1 = 1,000냥/점. 레벨 5 = 100,000냥/점이면 100배 적용
+function scaleMoney(base) {
+    const mult = Game.moneyPerPoint / 1000;
+    return Math.round(base * mult / 1000) * 1000; // 1,000냥 단위 반올림
+}
+
 // ── 수입 타이머 ────────────────────────────────────────────────────────
 function startIncomeTimer() {
     if (countdownTimer) return;
     countdownTimer = setInterval(() => {
         incomeSecondsLeft--;
         if (incomeSecondsLeft <= 0) {
-            Game.setPlayerMoney(Game.playerMoney + INCOME_AMOUNT);
+            const income = scaleMoney(INCOME_AMOUNT);
+            Game.setPlayerMoney(Game.playerMoney + income);
             UI.updateTotalMoneyDisplay(Game.playerMoney);
             Game.saveGameData();
             updateBoardInfo();
-            UI.showToast(`💴 세금 수입 +${INCOME_AMOUNT.toLocaleString()}냥`);
+            UI.showToast(`💴 세금 수입 +${income.toLocaleString()}냥`);
             incomeSecondsLeft = INCOME_INTERVAL_SEC;
         }
         updateIncomeDisplay();
@@ -382,10 +392,11 @@ function movePlayer(steps) {
 
         // 출발점 통과 보너스
         if (playerPosition === 0) {
-            Game.setPlayerMoney(Game.playerMoney + 10000);
+            const bonus = scaleMoney(10000);
+            Game.setPlayerMoney(Game.playerMoney + bonus);
             UI.updateTotalMoneyDisplay(Game.playerMoney);
             Game.saveGameData();
-            UI.showToast('출발점 통과! +10,000냥');
+            UI.showToast(`출발점 통과! +${bonus.toLocaleString()}냥`);
         }
 
         updateToken();
@@ -431,28 +442,29 @@ function landOnTile(pos) {
     // ── 장터: 소매치기잡기 (8명 수집 완료) / 하이로우 ───────────────
     if (tile.type === 'jangter') {
         if (getCompletedCollectionCount() >= 8) {
-            UI.showModal('장터 — 소매치기잡기', '장터가 소란스럽습니다! 소매치기를 잡아라!\n50초 안에 10명을 잡으면 +35,000냥, 실패하면 -5,000냥',
+            UI.showModal('장터 — 소매치기잡기', `장터가 소란스럽습니다! 소매치기를 잡아라!\n50초 안에 10명을 잡으면 +${scaleMoney(35000).toLocaleString()}냥, 실패하면 -${scaleMoney(5000).toLocaleString()}냥`,
                 () => showPickpocket(() => applyMgResult(true, 'pickpocket'), () => applyMgResult(false, 'pickpocket'))
             );
             return;
         }
-        UI.showModal('장터', '장터에서 화투 하이로우 내기를 제안받았습니다.\n2번 연속으로 맞추면 25,000냥!\n승부를 받아들이겠습니까?',
+        const hlWin = scaleMoney(25000), hlLose = scaleMoney(15000);
+        UI.showModal('장터', `장터에서 화투 하이로우 내기를 제안받았습니다.\n2번 연속으로 맞추면 ${hlWin.toLocaleString()}냥!\n승부를 받아들이겠습니까?`,
             () => {
                 HighLow.showHighLow(1, (won) => {
                     HighLow.hideHighLow();
-                    const delta = won ? 25000 : -15000;
+                    const delta = won ? hlWin : -hlLose;
                     Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
                     UI.updateTotalMoneyDisplay(Game.playerMoney);
                     Game.saveGameData();
                     updateBoardInfo();
                     UI.showModal(
                         won ? '승리!' : '패배!',
-                        won ? '두 번 연속 적중! +25,000냥' : '하이로우에서 졌습니다. -15,000냥',
+                        won ? `두 번 연속 적중! +${hlWin.toLocaleString()}냥` : `하이로우에서 졌습니다. -${hlLose.toLocaleString()}냥`,
                         () => { hasRolled = false; }
                     );
                 }, {
                     title: '장터 화투 내기!',
-                    desc: '2번 연속으로 맞추면 25,000냥 획득!',
+                    desc: `2번 연속으로 맞추면 ${hlWin.toLocaleString()}냥 획득!`,
                     required: 2,
                 });
             }
@@ -494,8 +506,8 @@ function landOnTile(pos) {
 
     // ── 서당: 슬라이드 퍼즐 ──────────────────────────────────────────
     if (tile.type === 'seodang') {
-        const WIN_REWARD  = 30000;
-        const CONSOLATION =  5000;
+        const WIN_REWARD  = scaleMoney(30000);
+        const CONSOLATION = scaleMoney(5000);
 
         const allUnlocked = [];
         STAGES.forEach(s => {
@@ -505,11 +517,12 @@ function landOnTile(pos) {
         });
 
         if (allUnlocked.length === 0) {
-            Game.setPlayerMoney(Game.playerMoney + 10000);
+            const bonus = scaleMoney(10000);
+            Game.setPlayerMoney(Game.playerMoney + bonus);
             UI.updateTotalMoneyDisplay(Game.playerMoney);
             Game.saveGameData();
             updateBoardInfo();
-            UI.showModal('서당', '서당에서 학문을 쌓았습니다. +10,000냥\n(배경을 수집하면 그림 맞추기에 도전할 수 있습니다!)', () => { hasRolled = false; });
+            UI.showModal('서당', `서당에서 학문을 쌓았습니다. +${bonus.toLocaleString()}냥\n(배경을 수집하면 그림 맞추기에 도전할 수 있습니다!)`, () => { hasRolled = false; });
             return;
         }
 
@@ -543,7 +556,7 @@ function landOnTile(pos) {
 
     // ── 기방: 쇼타임 감상 ────────────────────────────────────────────
     if (tile.type === 'gibang') {
-        const cost = 25000;
+        const cost = scaleMoney(25000);
         const allUnlocked = [];
         STAGES.forEach(s => {
             (Game.unlockedBackgrounds[s.id.toString()] || []).forEach(bgId => {
@@ -594,7 +607,7 @@ function landOnTile(pos) {
             showFinalEnding();
             return;
         }
-        const extra = 5000;
+        const extra = scaleMoney(5000);
         Game.setPlayerMoney(Game.playerMoney + extra);
         UI.updateTotalMoneyDisplay(Game.playerMoney);
         Game.saveGameData();
@@ -608,15 +621,16 @@ function landOnTile(pos) {
 
     // ── 과거장: 조선 상식 퀴즈 ───────────────────────────────────────
     if (tile.type === 'gwageo') {
+        const [gw1, gw2, gw3, gw4] = [50000, 20000, 5000, 15000].map(scaleMoney);
         UI.showModal(
             '📜 과거 시험',
-            '5문제를 풀어 정답 수에 따라 보상을 받습니다!\n장원급제(5개) +50,000냥 / 합격(3~4개) +20,000냥\n낙방(1~2개) -5,000냥 / 파방(0개) -15,000냥',
+            `5문제를 풀어 정답 수에 따라 보상을 받습니다!\n장원급제(5개) +${gw1.toLocaleString()}냥 / 합격(3~4개) +${gw2.toLocaleString()}냥\n낙방(1~2개) -${gw3.toLocaleString()}냥 / 파방(0개) -${gw4.toLocaleString()}냥`,
             () => showGwageo((correct) => {
                 let delta, title, msg;
-                if (correct >= 5)      { delta =  50000; title = '장원급제! 🎉'; msg = `5문제 전부 정답! +50,000냥`; }
-                else if (correct >= 3) { delta =  20000; title = '합격!';         msg = `${correct}문제 정답. +20,000냥`; }
-                else if (correct >= 1) { delta =  -5000; title = '낙방';          msg = `${correct}문제 정답. -5,000냥`; }
-                else                   { delta = -15000; title = '파방!';         msg = '전부 오답입니다. -15,000냥'; }
+                if (correct >= 5)      { delta =  gw1; title = '장원급제! 🎉'; msg = `5문제 전부 정답! +${gw1.toLocaleString()}냥`; }
+                else if (correct >= 3) { delta =  gw2; title = '합격!';         msg = `${correct}문제 정답. +${gw2.toLocaleString()}냥`; }
+                else if (correct >= 1) { delta = -gw3; title = '낙방';          msg = `${correct}문제 정답. -${gw3.toLocaleString()}냥`; }
+                else                   { delta = -gw4; title = '파방!';         msg = `전부 오답입니다. -${gw4.toLocaleString()}냥`; }
                 Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
                 UI.updateTotalMoneyDisplay(Game.playerMoney);
                 Game.saveGameData();
@@ -630,12 +644,12 @@ function landOnTile(pos) {
     // ── 기연: 낚시 (2명 수집 완료) / 패 3장 뒤집기 ──────────────────
     if (tile.type === 'giyeon') {
         if (getCompletedCollectionCount() >= 2) {
-            UI.showModal('기연 — 낚시', '기연의 인연으로 낚시터에서 도전!\n60초 안에 5마리를 잡으면 +35,000냥, 실패하면 -8,000냥',
+            UI.showModal('기연 — 낚시', `기연의 인연으로 낚시터에서 도전!\n60초 안에 5마리를 잡으면 +${scaleMoney(35000).toLocaleString()}냥, 실패하면 -${scaleMoney(8000).toLocaleString()}냥`,
                 () => showFishing(() => applyMgResult(true, 'fishing'), () => applyMgResult(false, 'fishing'))
             );
             return;
         }
-        const rewards = shuffle([8000, 15000, 25000]);
+        const rewards = shuffle([8000, 15000, 25000].map(scaleMoney));
         const icons = ['🌸', '🌺', '🌼'];
         const cards = rewards.map((r, i) => ({
             frontIcon: icons[i],
@@ -660,12 +674,12 @@ function landOnTile(pos) {
     // ── 누각: 오목 (1명 수집 완료) / 패 3장 뒤집기 ──────────────────
     if (tile.type === 'nugang') {
         if (getCompletedCollectionCount() >= 1) {
-            UI.showModal('누각 — 오목', '달밤의 누각에서 오목 고수가 도전해옵니다!\n5목을 완성하면 +50,000냥, 패배하면 -5,000냥',
+            UI.showModal('누각 — 오목', `달밤의 누각에서 오목 고수가 도전해옵니다!\n5목을 완성하면 +${scaleMoney(50000).toLocaleString()}냥, 패배하면 -${scaleMoney(5000).toLocaleString()}냥`,
                 () => showGomoku(() => applyMgResult(true, 'gomoku'), () => applyMgResult(false, 'gomoku'))
             );
             return;
         }
-        const rewards = shuffle([15000, 25000, 40000]);
+        const rewards = shuffle([15000, 25000, 40000].map(scaleMoney));
         const icons = ['🌟', '⭐', '🌙'];
         const cards = rewards.map((r, i) => ({
             frontIcon: icons[i],
@@ -690,15 +704,15 @@ function landOnTile(pos) {
     // ── 보부상: 지뢰찾기 (6명 수집 완료) / 물건 3개 뒤집기 ──────────
     if (tile.type === 'bobusang') {
         if (getCompletedCollectionCount() >= 6) {
-            UI.showModal('보부상 — 지뢰찾기', '보부상이 위험한 내기를 겁니다!\n8개의 지뢰를 피해 모두 열면 +35,000냥, 지뢰를 밟으면 -5,000냥',
+            UI.showModal('보부상 — 지뢰찾기', `보부상이 위험한 내기를 겁니다!\n8개의 지뢰를 피해 모두 열면 +${scaleMoney(35000).toLocaleString()}냥, 지뢰를 밟으면 -${scaleMoney(5000).toLocaleString()}냥`,
                 () => showMinesweeper(() => applyMgResult(true, 'minesweeper'), () => applyMgResult(false, 'minesweeper'))
             );
             return;
         }
         const items = shuffle([
-            { icon: '⚗️', name: '비약',   value: 25000 },
-            { icon: '📜', name: '비법서', value: 12000 },
-            { icon: '🎁', name: '보따리', value: 6000  },
+            { icon: '⚗️', name: '비약',   value: scaleMoney(25000) },
+            { icon: '📜', name: '비법서', value: scaleMoney(12000) },
+            { icon: '🎁', name: '보따리', value: scaleMoney(6000)  },
         ]);
         const cards = items.map(item => ({
             frontIcon: item.icon,
@@ -724,14 +738,15 @@ function landOnTile(pos) {
     // ── 방랑객: 화살피하기 (7명 수집 완료) / 보따리 2개 선택 ─────────
     if (tile.type === 'bangnanggaek') {
         if (getCompletedCollectionCount() >= 7) {
-            UI.showModal('방랑객 — 화살피하기', '방랑객이 위험한 내기를 겁니다!\n30초 동안 화살을 피하면 +40,000냥, 모두 맞으면 -8,000냥',
+            UI.showModal('방랑객 — 화살피하기', `방랑객이 위험한 내기를 겁니다!\n30초 동안 화살을 피하면 +${scaleMoney(40000).toLocaleString()}냥, 모두 맞으면 -${scaleMoney(8000).toLocaleString()}냥`,
                 () => showArrowDodge(() => applyMgResult(true, 'arrowdodge'), () => applyMgResult(false, 'arrowdodge'))
             );
             return;
         }
+        const bgAmt = scaleMoney(20000);
         const cards = shuffle([
-            { frontIcon: '🎁', frontLabel: '+20,000냥', value:  20000 },
-            { frontIcon: '😈', frontLabel: '-20,000냥', value: -20000 },
+            { frontIcon: '🎁', frontLabel: `+${bgAmt.toLocaleString()}냥`, value:  bgAmt },
+            { frontIcon: '😈', frontLabel: `-${bgAmt.toLocaleString()}냥`, value: -bgAmt },
         ]);
         showCardFlipChoice(
             '방랑객',
@@ -745,8 +760,8 @@ function landOnTile(pos) {
                 UI.showModal(
                     card.value > 0 ? '방랑객의 선물!' : '방랑객의 사기!',
                     card.value > 0
-                        ? '기이한 비약을 얻었습니다. +20,000냥'
-                        : '방랑객인 줄 알았더니 사기꾼! -20,000냥',
+                        ? `기이한 비약을 얻었습니다. +${bgAmt.toLocaleString()}냥`
+                        : `방랑객인 줄 알았더니 사기꾼! -${bgAmt.toLocaleString()}냥`,
                     () => { hasRolled = false; }
                 );
             }
@@ -756,60 +771,62 @@ function landOnTile(pos) {
 
     // ── 산적: 도주 / 싸움 / 몸값 ────────────────────────────────────
     if (tile.type === 'sanjeok') {
+        const [sEscOk, sEscFail, sFightWin, sFightLose, sRansom] =
+            [5000, 30000, 15000, 35000, 20000].map(scaleMoney);
         showChoiceModal(
             '산적 출몰!',
             '험악한 산적 무리가 앞을 가로막았습니다!',
             [
                 {
                     label: '🏃 도주하기',
-                    subtext: '성공(70%): -5,000냥 | 실패(30%): -30,000냥',
+                    subtext: `성공(70%): -${sEscOk.toLocaleString()}냥 | 실패(30%): -${sEscFail.toLocaleString()}냥`,
                     callback: () => {
                         const success = Math.random() < 0.7;
-                        const delta = success ? -5000 : -30000;
+                        const delta = success ? -sEscOk : -sEscFail;
                         Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
                         UI.updateTotalMoneyDisplay(Game.playerMoney);
                         Game.saveGameData();
                         updateBoardInfo();
                         UI.showModal(
                             success ? '도주 성공!' : '도주 실패!',
-                            success ? '간신히 도망쳤습니다. -5,000냥' : '붙잡혀 크게 당했습니다! -30,000냥',
+                            success ? `간신히 도망쳤습니다. -${sEscOk.toLocaleString()}냥` : `붙잡혀 크게 당했습니다! -${sEscFail.toLocaleString()}냥`,
                             () => { hasRolled = false; }
                         );
                     },
                 },
                 {
                     label: '⚔️ 결투하기',
-                    subtext: '강타 / 속공 / 방어 — 먼저 2승 | 승: +15,000냥 | 패: -35,000냥',
+                    subtext: `강타 / 속공 / 방어 — 먼저 2승 | 승: +${sFightWin.toLocaleString()}냥 | 패: -${sFightLose.toLocaleString()}냥`,
                     danger: true,
                     callback: () => {
                         showBanditFight(
                             () => {
-                                Game.setPlayerMoney(Game.playerMoney + 15000);
+                                Game.setPlayerMoney(Game.playerMoney + sFightWin);
                                 UI.updateTotalMoneyDisplay(Game.playerMoney);
                                 Game.saveGameData();
                                 updateBoardInfo();
-                                UI.showModal('결투 승리!', '산적을 물리쳤습니다! +15,000냥', () => { hasRolled = false; });
+                                UI.showModal('결투 승리!', `산적을 물리쳤습니다! +${sFightWin.toLocaleString()}냥`, () => { hasRolled = false; });
                             },
                             () => {
-                                Game.setPlayerMoney(Math.max(0, Game.playerMoney - 35000));
+                                Game.setPlayerMoney(Math.max(0, Game.playerMoney - sFightLose));
                                 UI.updateTotalMoneyDisplay(Game.playerMoney);
                                 Game.saveGameData();
                                 updateBoardInfo();
-                                UI.showModal('결투 패배', '산적에게 크게 당했습니다. -35,000냥', () => { hasRolled = false; });
+                                UI.showModal('결투 패배', `산적에게 크게 당했습니다. -${sFightLose.toLocaleString()}냥`, () => { hasRolled = false; });
                             }
                         );
                     },
                 },
                 {
                     label: '💰 몸값 제공',
-                    subtext: '-20,000냥 확정 (안전)',
+                    subtext: `-${sRansom.toLocaleString()}냥 확정 (안전)`,
                     highlight: true,
                     callback: () => {
-                        Game.setPlayerMoney(Math.max(0, Game.playerMoney - 20000));
+                        Game.setPlayerMoney(Math.max(0, Game.playerMoney - sRansom));
                         UI.updateTotalMoneyDisplay(Game.playerMoney);
                         Game.saveGameData();
                         updateBoardInfo();
-                        UI.showModal('몸값 제공', '산적에게 돈을 건네고 무사히 지났습니다. -20,000냥', () => { hasRolled = false; });
+                        UI.showModal('몸값 제공', `산적에게 돈을 건네고 무사히 지났습니다. -${sRansom.toLocaleString()}냥`, () => { hasRolled = false; });
                     },
                 },
             ],
@@ -822,7 +839,7 @@ function landOnTile(pos) {
     if (tile.type === 'hyeongok') {
         UI.showModal(
             '⛓ 형옥에 갇혔습니다!',
-            '관아에 잡혀 형옥에 투옥됐습니다.\n테트리스로 6줄을 제거해 탈출하면 +40,000냥\n실패하면 -8,000냥',
+            `관아에 잡혀 형옥에 투옥됐습니다.\n테트리스로 6줄을 제거해 탈출하면 +${scaleMoney(40000).toLocaleString()}냥\n실패하면 -${scaleMoney(8000).toLocaleString()}냥`,
             () => showTetris(() => applyMgResult(true, 'tetris'), () => applyMgResult(false, 'tetris'))
         );
         return;
@@ -831,7 +848,7 @@ function landOnTile(pos) {
     // ── 관아: 수도쿠 (5명 수집 완료) / 납세·뇌물 ───────────────────
     if (tile.type === 'gwana') {
         if (getCompletedCollectionCount() >= 5) {
-            UI.showModal('관아 — 수도쿠', '관아에서 두뇌 시험을 냅니다!\n9×9 수도쿠를 완성하면 +30,000냥, 포기하면 -5,000냥',
+            UI.showModal('관아 — 수도쿠', `관아에서 두뇌 시험을 냅니다!\n9×9 수도쿠를 완성하면 +${scaleMoney(30000).toLocaleString()}냥, 포기하면 -${scaleMoney(5000).toLocaleString()}냥`,
                 () => showSudoku(() => applyMgResult(true, 'sudoku'), () => applyMgResult(false, 'sudoku'))
             );
             return;
@@ -842,30 +859,32 @@ function landOnTile(pos) {
             [
                 {
                     label: '💸 순순히 납부',
-                    subtext: '-12,000냥 확정',
+                    subtext: `-${scaleMoney(12000).toLocaleString()}냥 확정`,
                     highlight: true,
                     callback: () => {
-                        Game.setPlayerMoney(Math.max(0, Game.playerMoney - 12000));
+                        const tax = scaleMoney(12000);
+                        Game.setPlayerMoney(Math.max(0, Game.playerMoney - tax));
                         UI.updateTotalMoneyDisplay(Game.playerMoney);
                         Game.saveGameData();
                         updateBoardInfo();
-                        UI.showModal('납세 완료', '깔끔하게 납세했습니다. -12,000냥', () => { hasRolled = false; });
+                        UI.showModal('납세 완료', `깔끔하게 납세했습니다. -${tax.toLocaleString()}냥`, () => { hasRolled = false; });
                     },
                 },
                 {
                     label: '🤫 뇌물 시도',
-                    subtext: '성공(50%): 세금 면제 | 발각(50%): -25,000냥',
+                    subtext: `성공(50%): 세금 면제 | 발각(50%): -${scaleMoney(25000).toLocaleString()}냥`,
                     danger: true,
                     callback: () => {
+                        const fine = scaleMoney(25000);
                         const success = Math.random() < 0.5;
                         if (success) {
                             UI.showModal('뇌물 성공!', '관리가 눈을 감아줬습니다. 세금 면제!', () => { hasRolled = false; });
                         } else {
-                            Game.setPlayerMoney(Math.max(0, Game.playerMoney - 25000));
+                            Game.setPlayerMoney(Math.max(0, Game.playerMoney - fine));
                             UI.updateTotalMoneyDisplay(Game.playerMoney);
                             Game.saveGameData();
                             updateBoardInfo();
-                            UI.showModal('뇌물 발각!', '뇌물이 들통났습니다! 벌금까지 -25,000냥', () => { hasRolled = false; });
+                            UI.showModal('뇌물 발각!', `뇌물이 들통났습니다! 벌금까지 -${fine.toLocaleString()}냥`, () => { hasRolled = false; });
                         }
                     },
                 },
@@ -878,7 +897,7 @@ function landOnTile(pos) {
     // ── 주막: 숫자야구 (3명 수집 완료) / 쉬어가기·내기 ──────────────
     if (tile.type === 'jujak') {
         if (getCompletedCollectionCount() >= 3) {
-            UI.showModal('주막 — 숫자야구', '주막 주인이 세 자리 숫자 내기를 제안합니다!\n7번 안에 맞추면 +30,000냥, 실패하면 -5,000냥',
+            UI.showModal('주막 — 숫자야구', `주막 주인이 세 자리 숫자 내기를 제안합니다!\n7번 안에 맞추면 +${scaleMoney(30000).toLocaleString()}냥, 실패하면 -${scaleMoney(5000).toLocaleString()}냥`,
                 () => showNumberBaseball(() => applyMgResult(true, 'baseball'), () => applyMgResult(false, 'baseball'))
             );
             return;
@@ -889,30 +908,32 @@ function landOnTile(pos) {
             [
                 {
                     label: '🍚 밥 한 끼',
-                    subtext: '+8,000냥 확정',
+                    subtext: `+${scaleMoney(8000).toLocaleString()}냥 확정`,
                     highlight: true,
                     callback: () => {
-                        Game.setPlayerMoney(Game.playerMoney + 8000);
+                        const meal = scaleMoney(8000);
+                        Game.setPlayerMoney(Game.playerMoney + meal);
                         UI.updateTotalMoneyDisplay(Game.playerMoney);
                         Game.saveGameData();
                         updateBoardInfo();
-                        UI.showModal('주막', '따뜻한 밥 한 끼. 기운이 돌아옵니다. +8,000냥', () => { hasRolled = false; });
+                        UI.showModal('주막', `따뜻한 밥 한 끼. 기운이 돌아옵니다. +${meal.toLocaleString()}냥`, () => { hasRolled = false; });
                     },
                 },
                 {
                     label: '🍶 막걸리 내기',
-                    subtext: '승리(60%): +20,000냥 | 패배(40%): -10,000냥',
+                    subtext: `승리(60%): +${scaleMoney(20000).toLocaleString()}냥 | 패배(40%): -${scaleMoney(10000).toLocaleString()}냥`,
                     danger: true,
                     callback: () => {
+                        const jWin = scaleMoney(20000), jLose = scaleMoney(10000);
                         const win = Math.random() < 0.6;
-                        const delta = win ? 20000 : -10000;
+                        const delta = win ? jWin : -jLose;
                         Game.setPlayerMoney(Math.max(0, Game.playerMoney + delta));
                         UI.updateTotalMoneyDisplay(Game.playerMoney);
                         Game.saveGameData();
                         updateBoardInfo();
                         UI.showModal(
                             win ? '내기 승리!' : '내기 패배!',
-                            win ? '막걸리 내기에서 이겼습니다! +20,000냥' : '내기에서 졌습니다. -10,000냥',
+                            win ? `막걸리 내기에서 이겼습니다! +${jWin.toLocaleString()}냥` : `내기에서 졌습니다. -${jLose.toLocaleString()}냥`,
                             () => { hasRolled = false; }
                         );
                     },
@@ -985,7 +1006,7 @@ function landOnTile(pos) {
     // ── 온천: 벽돌깨기 (4명 수집 완료) / 탕 3종 선택 ────────────────
     if (tile.type === 'oncheon') {
         if (getCompletedCollectionCount() >= 4) {
-            UI.showModal('온천 — 벽돌깨기', '온천 연회에서 벽돌깨기 대결!\n모든 벽돌을 깨면 +40,000냥, 실패하면 -8,000냥',
+            UI.showModal('온천 — 벽돌깨기', `온천 연회에서 벽돌깨기 대결!\n모든 벽돌을 깨면 +${scaleMoney(40000).toLocaleString()}냥, 실패하면 -${scaleMoney(8000).toLocaleString()}냥`,
                 () => showBreakout(() => applyMgResult(true, 'breakout'), () => applyMgResult(false, 'breakout'))
             );
             return;
@@ -996,47 +1017,48 @@ function landOnTile(pos) {
             [
                 {
                     label: '💧 기본탕',
-                    subtext: '+15,000냥 확정',
+                    subtext: `+${scaleMoney(15000).toLocaleString()}냥 확정`,
                     highlight: true,
                     callback: () => {
-                        Game.setPlayerMoney(Game.playerMoney + 15000);
+                        const r = scaleMoney(15000);
+                        Game.setPlayerMoney(Game.playerMoney + r);
                         UI.updateTotalMoneyDisplay(Game.playerMoney);
                         Game.saveGameData();
                         updateBoardInfo();
-                        UI.showModal('기본탕', '기본탕에서 피로를 풀었습니다. +15,000냥', () => { hasRolled = false; });
+                        UI.showModal('기본탕', `기본탕에서 피로를 풀었습니다. +${r.toLocaleString()}냥`, () => { hasRolled = false; });
                     },
                 },
                 {
                     label: '🌡️ 열탕',
-                    subtext: '효험(70%): +30,000냥 | 과열(30%): +5,000냥',
+                    subtext: `효험(70%): +${scaleMoney(30000).toLocaleString()}냥 | 과열(30%): +${scaleMoney(5000).toLocaleString()}냥`,
                     callback: () => {
                         const big = Math.random() < 0.7;
-                        const reward = big ? 30000 : 5000;
+                        const reward = big ? scaleMoney(30000) : scaleMoney(5000);
                         Game.setPlayerMoney(Game.playerMoney + reward);
                         UI.updateTotalMoneyDisplay(Game.playerMoney);
                         Game.saveGameData();
                         updateBoardInfo();
                         UI.showModal(
                             big ? '열탕 대성공!' : '열탕이 너무 뜨거워!',
-                            big ? '충분히 몸을 녹였습니다. +30,000냥' : '너무 뜨거워 금방 나왔습니다. +5,000냥',
+                            big ? `충분히 몸을 녹였습니다. +${reward.toLocaleString()}냥` : `너무 뜨거워 금방 나왔습니다. +${reward.toLocaleString()}냥`,
                             () => { hasRolled = false; }
                         );
                     },
                 },
                 {
                     label: '✨ 약탕',
-                    subtext: '신효(50%): +40,000냥 | 효과 미미(50%): +10,000냥',
+                    subtext: `신효(50%): +${scaleMoney(40000).toLocaleString()}냥 | 효과 미미(50%): +${scaleMoney(10000).toLocaleString()}냥`,
                     danger: true,
                     callback: () => {
                         const miracle = Math.random() < 0.5;
-                        const reward = miracle ? 40000 : 10000;
+                        const reward = miracle ? scaleMoney(40000) : scaleMoney(10000);
                         Game.setPlayerMoney(Game.playerMoney + reward);
                         UI.updateTotalMoneyDisplay(Game.playerMoney);
                         Game.saveGameData();
                         updateBoardInfo();
                         UI.showModal(
                             miracle ? '약탕 신효!' : '약탕 효과 미미',
-                            miracle ? '비밀 약재의 효험이 대단합니다! +40,000냥' : '약효가 약했네요. +10,000냥',
+                            miracle ? `비밀 약재의 효험이 대단합니다! +${reward.toLocaleString()}냥` : `약효가 약했네요. +${reward.toLocaleString()}냥`,
                             () => { hasRolled = false; }
                         );
                     },
@@ -1067,7 +1089,7 @@ function openDepositAmountModal(grade) {
             ? '보통 등급 — 70%: ×1.6 / 30%: ×0.8'
             : '고위험 등급 — 50%: ×2.0 / 50%: ×0.5';
 
-    const amounts = [10000, 20000, 30000];
+    const amounts = [10000, 20000, 30000].map(scaleMoney);
     const choices = amounts
         .filter(a => Game.playerMoney >= a)
         .map(a => ({
@@ -1089,7 +1111,7 @@ function openDepositAmountModal(grade) {
         }));
 
     if (choices.length === 0) {
-        UI.showModal('객주', '예치할 냥이 부족합니다. (최소 10,000냥)', () => { hasRolled = false; });
+        UI.showModal('객주', `예치할 냥이 부족합니다. (최소 ${amounts[0].toLocaleString()}냥)`, () => { hasRolled = false; });
         return;
     }
 
