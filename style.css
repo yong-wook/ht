@@ -2417,48 +2417,60 @@ h3 {
         overflow: hidden;
     }
 
-    /* ── 보드 컨테이너: 세로 모드에서 가로 패딩 제거 ── */
+    /* ── 보드 컨테이너: 가로 패딩 제거, 중앙 정렬 ── */
     #board-container {
-        padding: 40px 0 10px;
+        padding: 38px 0 10px;
         overflow-y: auto;
         overflow-x: hidden;
         align-items: flex-start;
         justify-content: center;
     }
 
-    /* ── 보드 그리드: 7열이 화면 폭에 딱 맞도록 타일 축소 ── */
+    /* ── 보드 그리드: 7열이 화면 폭에 딱 맞도록 ── */
     #board-grid {
-        --ts: calc((100vw - 16px) / 7);
-        --tc: calc(var(--ts) * 1.35);
+        --ts: calc((100vw - 8px) / 7);   /* gap 6×2 + padding 2×2 + border 2 = 총 16 제외 */
+        --tc: calc(var(--ts) * 1.5);      /* 캐릭터 행을 1.5배 높여 이미지 가시성 확보 */
     }
 
-    /* ── 보드 중앙 간격 축소 ── */
+    /* ── 보드 중앙: 필수 컨트롤만 큼직하게 ── */
     #board-center {
-        gap: 4px;
-        padding: 4px;
+        gap: 5px;
+        padding: 6px 4px;
     }
+    /* 위치 텍스트 숨김 (화면 공간 확보) */
+    #board-pos-display { display: none; }
+
     .die {
-        width:  clamp(36px, 12vw, 56px);
-        height: clamp(36px, 12vw, 56px);
-        font-size: clamp(1.4em, 5vw, 2.4em);
+        width:  clamp(38px, 11.5vw, 54px);
+        height: clamp(38px, 11.5vw, 54px);
+        font-size: clamp(1.5em, 5.2vw, 2.5em);
     }
+    /* 굴리기 버튼: 중앙 전체 너비, 터치 편의 높이 */
     #board-roll-btn {
-        padding: 8px 14px;
-        font-size: 0.95em;
+        width: 90%;
+        padding: 11px 8px;
+        font-size: 1.0em;
+        box-sizing: border-box;
     }
-    #board-money-display  { font-size: 0.88em; }
-    #board-income-timer   { font-size: 0.72em; padding: 2px 7px; margin-top: 0; }
-    #board-dice-result    { font-size: 0.72em; min-height: 0; }
-    #board-level-display  { font-size: 0.68em; }
-    #board-levelup-btn    { font-size: 0.65em; padding: 3px 6px; }
-    #board-pos-display    { font-size: 0.7em; }
+    #board-money-display  { font-size: 0.92em; }
+    #board-income-timer   { font-size: 0.7em; padding: 2px 7px; margin-top: 0; }
+    #board-dice-result    { font-size: 0.75em; min-height: 0; }
+    #board-level-display  { font-size: 0.66em; }
+    #board-levelup-btn    { font-size: 0.65em; padding: 4px 7px; white-space: nowrap; }
     #board-level-row      { margin-top: 0; gap: 4px; }
 
-    /* 타일 내용 글자 축소 */
-    .tile-icon      { font-size: clamp(0.8em, 3.5vw, 1.4em); }
-    .tile-name      { font-size: clamp(0.42em, 1.8vw, 0.75em); }
-    .tile-char-name { font-size: clamp(0.38em, 1.6vw, 0.7em); }
-    .tile-hearts-row { font-size: clamp(0.3em, 1.2vw, 0.6em); }
+    /* 플레이어 토큰 축소 (타일 53px 대비 적정 크기) */
+    #player-token {
+        width: 26px;
+        height: 26px;
+        box-shadow: 0 0 10px rgba(255,200,0,0.9);
+    }
+
+    /* 타일 내용 글자: vw 기반으로 타일 크기에 비례 */
+    .tile-icon      { font-size: clamp(0.8em, 3.8vw, 1.5em); }
+    .tile-name      { font-size: clamp(0.4em, 1.9vw, 0.78em); }
+    .tile-char-name { font-size: clamp(0.38em, 1.7vw, 0.72em); }
+    .tile-hearts-row { font-size: clamp(0.3em, 1.3vw, 0.6em); }
 
     /* ── 캐릭터 패널: 세로 레이아웃 ── */
     #char-panel-content {
