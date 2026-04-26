@@ -2587,10 +2587,11 @@ h3 {
         display: flex;
         flex-direction: column;
         width: 100%;
-        min-height: 30vh;   /* 바닥패 최소 가시 높이 보장 */
+        min-height: 30vh;
         margin: 0;
-        gap: 3px;
-        overflow: hidden;
+        gap: 0;
+        overflow: visible;
+        position: relative;
     }
 
     .field {
@@ -2604,9 +2605,36 @@ h3 {
         -webkit-overflow-scrolling: touch;
     }
 
+    /* 더미칸: 바닥판 우하단 코너에 소형 오버레이 */
     .deck-area {
-        flex: 0 0 auto;
-        padding: 2px;
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+        z-index: 20;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 4px;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        padding: 4px 6px;
+    }
+
+    .deck-area h2 { display: none; }
+
+    #deck-area .card,
+    #flipped-card-container .card {
+        width: 9vw;
+        height: calc(9vw * 1.6);
+        margin: 0;
+    }
+
+    #flipped-card-container {
+        min-width: 9vw;
+        min-height: calc(9vw * 1.6);
+        border: 1px dashed rgba(255, 255, 255, 0.35);
+        border-radius: 4px;
     }
 
     /* ── 플레이어 영역: 최대 높이 제한으로 바닥패 보호 ── */
