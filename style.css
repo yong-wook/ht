@@ -2459,30 +2459,43 @@ h3 {
         margin: 0;
     }
 
-    /* ── 컴퓨터 패 영역: 획득패만 가로 스크롤 띠 형태 ── */
+    /* ── 카드 크기 (세로 모드 전체) ── */
+    .card {
+        width: 10vw;
+        height: calc(10vw * 1.6);
+        margin: 1px;
+    }
+
+    /* card-container min-height 제거 (겹침 방지) */
+    .card-container { min-height: 0; }
+
+    /* ── 컴퓨터 영역: 획득패 가로 스크롤 띠 ── */
     #computer-hand {
         flex: 0 0 auto;
         display: flex !important;
         flex-direction: column;
         width: 100%;
-        min-height: 0;
+        max-height: 16vh;
+        overflow: hidden;
         padding: 2px 4px;
         background: rgba(0,0,0,0.25);
         border-radius: 6px;
+        box-sizing: border-box;
     }
 
-    #computer-hand > h2 { display: none; }
-    #computer-hand > .card-container { display: none; } /* 컴퓨터 손패 숨김 */
+    #computer-hand > h2            { display: none; }
+    #computer-hand > .card-container { display: none; }
 
-    /* ── 판 영역 ── */
+    /* ── 바닥패(중앙) 영역 ── */
     .center-area {
         flex: 1 1 0;
         display: flex;
         flex-direction: column;
         width: 100%;
-        min-height: 0;
+        min-height: 30vh;   /* 바닥패 최소 가시 높이 보장 */
         margin: 0;
         gap: 3px;
+        overflow: hidden;
     }
 
     .field {
@@ -2490,43 +2503,47 @@ h3 {
         min-height: 0;
         width: 100%;
         padding: 4px;
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
         margin: 0;
+        -webkit-overflow-scrolling: touch;
     }
 
     .deck-area {
-        flex-shrink: 0;
+        flex: 0 0 auto;
         padding: 2px;
     }
 
-    /* ── 플레이어 패 영역: 획득패 + 손패 ── */
+    /* ── 플레이어 영역: 최대 높이 제한으로 바닥패 보호 ── */
     #player-hand {
         flex: 0 0 auto;
         display: flex;
         flex-direction: column;
         width: 100%;
+        max-height: 38vh;
+        overflow: hidden;
         padding: 2px 4px;
         background: rgba(0,0,0,0.25);
         border-radius: 6px;
         gap: 2px;
+        box-sizing: border-box;
     }
 
     #player-hand > h2 { display: none; }
 
-    /* 손패 카드 */
+    /* 손패 카드 한 줄 가로 스크롤 */
     #player-hand > .card-container {
         display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        justify-content: flex-start;
         gap: 2px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
     }
-
-    /* ── 카드 크기 ── */
-    .card {
-        width: 13vw;
-        height: calc(13vw * 1.6);
-        margin: 1px;
-    }
+    #player-hand > .card-container::-webkit-scrollbar { display: none; }
+    #player-hand > .card-container .card { flex-shrink: 0; }
 
     /* ── 획득한 패: 가로 스크롤 띠 ── */
     .acquired-cards {
@@ -2535,6 +2552,7 @@ h3 {
         padding: 2px 0;
         border-top: none;
         overflow: hidden;
+        flex-shrink: 0;
     }
 
     .acquired-cards h3 {
@@ -2543,9 +2561,7 @@ h3 {
         color: rgba(255,220,100,0.9);
     }
 
-    .acquired-group {
-        margin-bottom: 2px;
-    }
+    .acquired-group { margin-bottom: 2px; }
 
     .acquired-group h4 {
         font-size: 0.65em;
@@ -2570,8 +2586,8 @@ h3 {
     .acquired-group-cards::-webkit-scrollbar { display: none; }
 
     .acquired-group-cards .card {
-        width: 9vw;
-        height: calc(9vw * 1.6);
+        width: 8vw;
+        height: calc(8vw * 1.6);
         flex-shrink: 0;
         margin: 0;
     }
