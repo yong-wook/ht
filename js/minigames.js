@@ -128,7 +128,7 @@ export function showGomoku(onWin, onLose) {
         }
         b[r][c] = 0;
         const center = SIZE - Math.abs(r - (SIZE >> 1)) - Math.abs(c - (SIZE >> 1));
-        return aiScore * 2 + plScore + center * 10;
+        return aiScore * 1.2 + plScore + center * 10;
     }
 
     function aiMove() {
@@ -142,7 +142,18 @@ export function showGomoku(onWin, onLose) {
             if (board[r][c]) continue;
             board[r][c] = 1; if (checkWin(board, 1)) { board[r][c] = 0; return [r, c]; } board[r][c] = 0;
         }
-        // 3. 위협 점수 기반 최선의 수
+        // 3. 25% 확률로 인접 랜덤 수 (AI 실수)
+        if (Math.random() < 0.25) {
+            const cands = [];
+            for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+                if (board[r][c]) continue;
+                const adj = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+                if (adj.some(([dr,dc]) => { const nr=r+dr,nc=c+dc; return nr>=0&&nr<SIZE&&nc>=0&&nc<SIZE&&board[nr][nc]; }))
+                    cands.push([r, c]);
+            }
+            if (cands.length) return cands[Math.floor(Math.random() * cands.length)];
+        }
+        // 4. 위협 점수 기반 최선의 수
         let best = -1, br = -1, bc = -1;
         for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
             if (board[r][c]) continue;
