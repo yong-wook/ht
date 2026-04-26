@@ -931,6 +931,9 @@ function _startTetris(onWin, onLose, bgImg) {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
     }, { passive: false });
+    canvas2.addEventListener('touchmove', e => {
+        e.preventDefault(); // 스와이프 중 박스/페이지 스크롤 방지
+    }, { passive: false });
     canvas2.addEventListener('touchend', e => {
         if (gameOver) return;
         e.preventDefault();
