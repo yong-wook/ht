@@ -1361,7 +1361,7 @@ export function showPickpocket(onWin, onLose) {
     interior.sort(() => Math.random() - 0.5);
     let placed = 0;
     for (const [r, c] of interior) {
-        if (placed >= 8) break;
+        if (placed >= 5) break;
         blocked[r][c] = true;
         if (!findEscapeStep(thiefR, thiefC)) { blocked[r][c] = false; continue; }
         placed++;
