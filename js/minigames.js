@@ -520,12 +520,14 @@ export function showBreakout(onWin, onLose) {
 }
 
 function _startBreakout(onWin, onLose, bgImg) {
-    const W = 400;
+    // 세로모드 핏: 박스 패딩(24px*2) 제외한 뷰포트 너비에 맞춤
+    const W = Math.min(400, Math.floor(window.innerWidth * 0.88));
+    const maxH = Math.floor(window.innerHeight * 0.65);
     const H = bgImg
-        ? Math.min(560, Math.round(W * bgImg.naturalHeight / bgImg.naturalWidth))
-        : 280;
+        ? Math.min(maxH, Math.round(W * bgImg.naturalHeight / bgImg.naturalWidth))
+        : Math.min(maxH, 280);
 
-    const PAD_W=64, PAD_H=10, PAD_Y=H-26, BALL_R=7;
+    const PAD_W=Math.max(56, Math.floor(W*0.16)), PAD_H=10, PAD_Y=H-26, BALL_R=7;
     const BRICK_COLS=8, BRICK_ROWS=4;
     const BRICK_W=Math.floor((W-20)/BRICK_COLS), BRICK_H=18, BRICK_TOP=28;
     const ROW_COLORS=['#ff6666','#ffaa44','#ffee44','#44cc88'];
@@ -544,7 +546,7 @@ function _startBreakout(onWin, onLose, bgImg) {
         </div>
         <canvas id="mg-brk-canvas" width="${W}" height="${H}"
             style="display:block; margin:0 auto; border-radius:6px;"></canvas>
-        <p class="mg-hint">마우스로 패들 조종 &nbsp;|&nbsp; 💚 아이템 = 공 추가</p>
+        <p class="mg-hint">마우스/터치로 패들 조종 &nbsp;|&nbsp; 💚 아이템 = 공 추가</p>
     `;
     ov.appendChild(box);
 
@@ -567,7 +569,9 @@ function _startBreakout(onWin, onLose, bgImg) {
         const rect=canvas.getBoundingClientRect();
         padX = Math.max(0, Math.min(W-PAD_W, (e.clientX-rect.left)*(W/rect.width)-PAD_W/2));
     });
-    canvas.addEventListener('touchmove', e => {
+    // box 전체를 터치 영역으로 사용 - 캔버스 밖으로 손가락이 나가도 패들 추적
+    box.style.touchAction = 'none';
+    box.addEventListener('touchmove', e => {
         e.preventDefault();
         const rect=canvas.getBoundingClientRect();
         padX = Math.max(0, Math.min(W-PAD_W, (e.touches[0].clientX-rect.left)*(W/rect.width)-PAD_W/2));
