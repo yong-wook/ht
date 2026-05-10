@@ -762,6 +762,7 @@ function _startBreakout(onWin, onLose, bgImg) {
     // 공 물리 업데이트. 반환값: true=아웃, 'win'=클리어
     function updateBall(ball) {
         const r = ballR();
+        const oldVy = ball.vy;  // 충전 트리거 감지용
         ball.x+=ball.vx; ball.y+=ball.vy;
         if (ball.x-r<0){ball.x=r;ball.vx=Math.abs(ball.vx);audioManager.playSfx(SFX.CARD_FLIP);}
         if (ball.x+r>W){ball.x=W-r;ball.vx=-Math.abs(ball.vx);audioManager.playSfx(SFX.CARD_FLIP);}
@@ -770,7 +771,6 @@ function _startBreakout(onWin, onLose, bgImg) {
             ball.x>=padX-4 && ball.x<=padX+PAD_W+4 && ball.vy>0) {
             ball.vx=((ball.x-(padX+PAD_W/2))/(PAD_W/2))*5;
             ball.vy=-Math.abs(ball.vy); ball.y=PAD_Y-r;
-            ball.charge = Math.max(1, cumItems);  // 패들 복귀 = 풀충전
             audioManager.playSfx(SFX.CARD_PLAY);
         }
 
@@ -804,6 +804,10 @@ function _startBreakout(onWin, onLose, bgImg) {
                 }
                 // 잔탄 남음 → 계속 관통
             }
+        }
+        // vy 부호 전환(아래→위) 감지: 패들 또는 벽돌 아래면에서 튕긴 순간 → 풀충전
+        if (oldVy > 0 && ball.vy < 0) {
+            ball.charge = Math.max(1, cumItems);
         }
         return ball.y-r>H;
     }
