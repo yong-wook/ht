@@ -2782,11 +2782,10 @@ h3 {
     /* ── 쇼타임 컨테이너 ── */
     .showtime-container {
         width: 95vw;
-        height: auto;
-        max-height: 95vh;
-        overflow-y: auto;
-        font-size: 1.5em;
-        padding: 15px;
+        height: 95vh;
+        overflow: hidden;
+        font-size: 1.2em;
+        padding: 10px;
     }
 
     .showtime-container h2 { font-size: 1.2em; }
@@ -2994,14 +2993,10 @@ h3 {
 @media screen and (orientation: portrait) and (max-width: 768px) {
     .showtime-container {
         width: 95vw;
-        height: auto;
-        /* 내용에 따라 높이 자동 조절 */
-        max-height: 95vh;
-        /* 뷰포트 높이의 95%를 최대 높이로 설정 */
-        overflow-y: auto;
-        /* 내용이 넘칠 경우 스크롤바 표시 */
-        font-size: 1.5em;
-        padding: 15px;
+        height: 95vh;
+        overflow: hidden;
+        font-size: 1.2em;
+        padding: 10px;
     }
 
     .showtime-container h2 {
