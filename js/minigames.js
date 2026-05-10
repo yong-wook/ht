@@ -525,14 +525,34 @@ function _startBreakout(onWin, onLose, bgImg) {
     const maxH = Math.floor(window.innerHeight * 0.65);
     const H = bgImg
         ? Math.min(maxH, Math.round(W * bgImg.naturalHeight / bgImg.naturalWidth))
-        : Math.min(maxH, 280);
+        : Math.min(maxH, 340);
 
     const PAD_W=Math.max(56, Math.floor(W*0.16)), PAD_H=10, PAD_Y=H-26, BALL_R=7;
-    const BRICK_COLS=8, BRICK_ROWS=4;
+    const BRICK_COLS=8, INIT_ROWS=3;
     const BRICK_W=Math.floor((W-20)/BRICK_COLS), BRICK_H=18, BRICK_TOP=28;
-    const ROW_COLORS=['#ff6666','#ffaa44','#ffee44','#44cc88'];
+    const ROW_GAP=4, BRICK_LINE_H=BRICK_H+ROW_GAP;
+    // HP별 색상: 약함→강함 = 녹→황→주→보
+    const HP_COLOR={1:'#44cc88', 2:'#ffee44', 3:'#ff8833', 4:'#cc44ff'};
+    const INIT_HP_BY_ROW=[2,1,1];
     const INIT_LIVES=3;
-    const ITEM_R=9, ITEM_SPEED=2.2, ITEM_CHANCE=0.28;
+    const ITEM_R=9, ITEM_SPEED=2.2, ITEM_CHANCE=0.22;
+    const TRAIL_LEN_BASE=6;
+    // 보충 시스템
+    const TARGET_KILLS=100;
+    const DANGER_Y=PAD_Y-30;                  // 이 라인 아래로 벽돌 도달 시 게임오버
+    const SLIDE_PX_PER_SEC=BRICK_LINE_H/0.3;  // 0.3초 슬라이드
+    // 누적 아이템 수에 따른 보충 간격(초). 최소 2.5초.
+    function getSpawnInterval(c) { return Math.max(2.5, 8 - c * 0.3); }
+    // 누적 아이템 수에 따른 공 색상 [중심색, 외곽색]
+    function getBallColors(c) {
+        if (c <= 0)  return ['#ffffff','#aaaaee'];
+        if (c <= 3)  return ['#ffffff','#ffcc44'];
+        if (c <= 6)  return ['#ffee88','#ff7700'];
+        if (c <= 10) return ['#ff9966','#ff2200'];
+        if (c <= 15) return ['#ffaaff','#ff44cc'];
+        if (c <= 20) return ['#ddaaff','#aa44ff'];
+        return                  ['#ffffff','#ff44ff'];
+    }
 
     const ov = buildOverlay();
     const box = document.createElement('div');
@@ -541,12 +561,12 @@ function _startBreakout(onWin, onLose, bgImg) {
         <h3 class="bm-title">🧱 벽돌깨기</h3>
         <div class="mg-info-row">
             <span id="brk-lives">❤️ × ${INIT_LIVES}</span>
-            <span id="brk-balls">🔵 × 1</span>
-            <span id="brk-left">벽돌: ${BRICK_ROWS*BRICK_COLS}</span>
+            <span id="brk-balls">⚡ 1/0</span>
+            <span id="brk-left">🧱 0/${TARGET_KILLS}</span>
         </div>
         <canvas id="mg-brk-canvas" width="${W}" height="${H}"
             style="display:block; margin:0 auto; border-radius:6px;"></canvas>
-        <p class="mg-hint">마우스/터치로 패들 조종 &nbsp;|&nbsp; 💚 아이템 = 공 추가</p>
+        <p class="mg-hint">마우스/터치로 패들 조종 &nbsp;|&nbsp; 💚 아이템 = 파워업</p>
     `;
     ov.appendChild(box);
 
@@ -557,13 +577,66 @@ function _startBreakout(onWin, onLose, bgImg) {
     const leftEl  = box.querySelector('#brk-left');
 
     let lives=INIT_LIVES, gameOver=false, animId, padX=W/2-PAD_W/2;
-    let balls = [{ x:W/2, y:H/2-40, vx:3, vy:-3.8 }];
+    let mainBall = { x:padX+PAD_W/2, y:PAD_Y-BALL_R-1, vx:3, vy:-3.8, charge:1 };
+    let cumItems = 0;       // 누적 UP 획득 수 (무한 증가)
+    let ballHistory = [];   // 잔상용 위치 이력
     let items = [];
+    let destroyedCount = 0; // 누적 파괴 수 (클리어 카운터)
+    let spawnTimer = 0;     // 다음 줄 추가까지 누적 시간(초)
+    let lastFrameTime = performance.now();
+
+    // 누적 아이템 수에 비례한 공 반지름 (캡)
+    function ballR() { return BALL_R + Math.min(cumItems, 16) * 0.5; }
+    function trailLen() { return Math.min(20, TRAIL_LEN_BASE + Math.floor(cumItems * 0.5)); }
 
     const bricks = [];
-    for (let r=0;r<BRICK_ROWS;r++) for (let c=0;c<BRICK_COLS;c++)
-        bricks.push({x:10+c*BRICK_W, y:BRICK_TOP+r*(BRICK_H+4), alive:true, color:ROW_COLORS[r]});
+    for (let r=0; r<INIT_ROWS; r++) {
+        const hp = INIT_HP_BY_ROW[r];
+        for (let c=0; c<BRICK_COLS; c++) {
+            const y = BRICK_TOP + r*BRICK_LINE_H;
+            bricks.push({x:10+c*BRICK_W, y, targetY:y, alive:true, color:HP_COLOR[hp], hp, maxHp:hp});
+        }
+    }
     let bricksLeft = bricks.length;
+
+    // 위에서 새 줄 1개 추가, 살아있는 기존 벽돌은 한 칸 아래로 슬라이드 다운
+    function addBrickRow() {
+        for (const b of bricks) {
+            if (b.alive) b.targetY = (b.targetY ?? b.y) + BRICK_LINE_H;
+        }
+        const k = destroyedCount;
+        const hpMax = k < 30 ? 1 : k < 60 ? 2 : k < 80 ? 3 : 4;
+        for (let c=0; c<BRICK_COLS; c++) {
+            const hp = 1 + Math.floor(Math.random() * hpMax);
+            bricks.push({
+                x: 10 + c*BRICK_W,
+                y: BRICK_TOP - BRICK_LINE_H,   // 화면 위에서 시작
+                targetY: BRICK_TOP,
+                alive: true,
+                color: HP_COLOR[hp] || HP_COLOR[4],
+                hp, maxHp: hp,
+            });
+        }
+        bricksLeft += BRICK_COLS;
+    }
+
+    // 슬라이드 보간: 살아있는 벽돌이 targetY로 부드럽게 내려옴
+    function slideBricks(dt) {
+        const step = SLIDE_PX_PER_SEC * dt;
+        for (const b of bricks) {
+            if (!b.alive) continue;
+            if (b.y < b.targetY) b.y = Math.min(b.targetY, b.y + step);
+        }
+    }
+
+    // 가장 아래 벽돌이 위험 라인 도달했는지
+    function isDangerReached() {
+        for (const b of bricks) {
+            if (!b.alive) continue;
+            if (b.y + BRICK_H >= DANGER_Y) return true;
+        }
+        return false;
+    }
 
     canvas.addEventListener('mousemove', e => {
         const rect=canvas.getBoundingClientRect();
@@ -588,8 +661,26 @@ function _startBreakout(onWin, onLose, bgImg) {
         }
         bricks.forEach(b => {
             if (!b.alive) return;
+            const hpRatio = b.hp / b.maxHp;
+            ctx.globalAlpha = 0.55 + hpRatio * 0.45;
             ctx.fillStyle=b.color; ctx.fillRect(b.x+1,b.y+1,BRICK_W-3,BRICK_H-3);
-            ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillRect(b.x+2,b.y+2,BRICK_W-4,5);
+            // 균열 표시 (HP 손상 시)
+            if (b.hp < b.maxHp) {
+                ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=1;
+                ctx.beginPath();
+                ctx.moveTo(b.x+BRICK_W*0.3, b.y+2); ctx.lineTo(b.x+BRICK_W*0.45, b.y+BRICK_H-2);
+                ctx.moveTo(b.x+BRICK_W*0.6, b.y+3); ctx.lineTo(b.x+BRICK_W*0.5, b.y+BRICK_H-3);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = hpRatio * 0.28;
+            ctx.fillStyle='rgba(255,255,255,1)'; ctx.fillRect(b.x+2,b.y+2,BRICK_W-4,5);
+            ctx.globalAlpha = 1;
+            // HP 숫자 (내구도 2 이상인 벽돌만)
+            if (b.maxHp > 1) {
+                ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font=`bold ${BRICK_H-5}px sans-serif`;
+                ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText(b.hp, b.x+BRICK_W/2, b.y+BRICK_H/2);
+            }
         });
         // 낙하 아이템
         items.forEach(it => {
@@ -600,68 +691,158 @@ function _startBreakout(onWin, onLose, bgImg) {
             ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
             ctx.fillStyle='#fff'; ctx.font='bold 8px sans-serif';
             ctx.textAlign='center'; ctx.textBaseline='middle';
-            ctx.fillText('+1', it.x, it.y);
+            ctx.fillText('UP', it.x, it.y);
         });
         // 패들
         const pg=ctx.createLinearGradient(padX,PAD_Y,padX,PAD_Y+PAD_H);
         pg.addColorStop(0,'#88ccff'); pg.addColorStop(1,'#4488bb');
         ctx.fillStyle=pg; ctx.fillRect(padX,PAD_Y,PAD_W,PAD_H);
-        // 공
-        balls.forEach(ball => {
-            const bg=ctx.createRadialGradient(ball.x-2,ball.y-2,1,ball.x,ball.y,BALL_R);
-            bg.addColorStop(0,'#fff'); bg.addColorStop(1,'#aae');
-            ctx.beginPath(); ctx.arc(ball.x,ball.y,BALL_R,0,Math.PI*2);
-            ctx.fillStyle=bg; ctx.fill();
-        });
+        // 잔상 (뒤→앞 순서로 그려 겹침 처리)
+        const [pc0, pc1] = getBallColors(cumItems);
+        const TLEN = trailLen();
+        for (let i = Math.min(ballHistory.length-1, TLEN); i >= 1; i--) {
+            const pos = ballHistory[i];
+            const ratio = i / (TLEN + 1);
+            ctx.globalAlpha = (1 - ratio) * 0.55;
+            const tr = ballR() * (1 - ratio * 0.4);
+            const tg = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, tr);
+            tg.addColorStop(0, pc0); tg.addColorStop(1, pc1);
+            ctx.beginPath(); ctx.arc(pos.x, pos.y, tr, 0, Math.PI*2);
+            ctx.fillStyle=tg; ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        // 메인 공 (잔탄 비율로 채도 보정 — 잔탄 적으면 흐려짐)
+        const r = ballR();
+        const chargeRatio = cumItems > 0 ? Math.max(0.4, mainBall.charge / Math.max(1, cumItems)) : 1;
+        ctx.globalAlpha = chargeRatio;
+        const bg=ctx.createRadialGradient(mainBall.x-r*0.3, mainBall.y-r*0.3, r*0.1, mainBall.x, mainBall.y, r);
+        bg.addColorStop(0, pc0); bg.addColorStop(1, pc1);
+        ctx.beginPath(); ctx.arc(mainBall.x, mainBall.y, r, 0, Math.PI*2);
+        ctx.fillStyle=bg; ctx.fill();
+        // cumItems 3 이상: 공 외곽 글로우 (강도는 cumItems 비례)
+        if (cumItems >= 3) {
+            ctx.shadowColor = pc1;
+            ctx.shadowBlur = Math.min(40, 6 + cumItems * 2);
+            ctx.beginPath(); ctx.arc(mainBall.x, mainBall.y, r, 0, Math.PI*2);
+            ctx.strokeStyle = pc1; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+        ctx.globalAlpha = 1;
+        // 위험 경고: 가장 아래 벽돌이 위험 라인 60px 이내면 빨강 페이드
+        let nearest = 0;
+        for (const b of bricks) if (b.alive && b.y+BRICK_H > nearest) nearest = b.y+BRICK_H;
+        const proximity = Math.max(0, Math.min(1, (nearest - (DANGER_Y-60)) / 60));
+        if (proximity > 0) {
+            const pulse = 0.5 + 0.5*Math.sin(performance.now()*0.012);
+            ctx.fillStyle = `rgba(255,40,40,${(0.10 + 0.18*pulse) * proximity})`;
+            ctx.fillRect(0, 0, W, H);
+        }
     }
 
-    // 공 하나 업데이트. 반환값: true=아웃(제거), 'win'=전체 벽돌 제거
+    // 벽돌 데미지 처리. 반환값: 'destroyed'|'damaged'|'blocked'|false
+    // charge = 0:    데미지 못 줌, 'blocked' (반사만 발생)
+    // charge ≥ HP:   한 방 부숨, charge -= HP, 'destroyed'
+    // charge < HP:   부분 데미지(b.hp -= charge), charge = 0, 'damaged' (반사)
+    function damageBrick(b) {
+        if (!b.alive) return false;
+        if (mainBall.charge <= 0) return 'blocked';
+        if (mainBall.charge < b.hp) {
+            b.hp -= mainBall.charge;
+            mainBall.charge = 0;
+            return 'damaged';
+        }
+        mainBall.charge -= b.hp;
+        b.alive=false; bricksLeft--; destroyedCount++;
+        leftEl.textContent=`🧱 ${destroyedCount}/${TARGET_KILLS}`;
+        if (Math.random() < ITEM_CHANCE)
+            items.push({ x:b.x+BRICK_W/2, y:b.y+BRICK_H/2, vy:ITEM_SPEED });
+        return 'destroyed';
+    }
+
+    // 공 물리 업데이트. 반환값: true=아웃, 'win'=클리어
     function updateBall(ball) {
+        const r = ballR();
         ball.x+=ball.vx; ball.y+=ball.vy;
-        if (ball.x-BALL_R<0){ball.x=BALL_R;ball.vx=Math.abs(ball.vx);audioManager.playSfx(SFX.CARD_FLIP);}
-        if (ball.x+BALL_R>W){ball.x=W-BALL_R;ball.vx=-Math.abs(ball.vx);audioManager.playSfx(SFX.CARD_FLIP);}
-        if (ball.y-BALL_R<0){ball.y=BALL_R;ball.vy=Math.abs(ball.vy);audioManager.playSfx(SFX.CARD_FLIP);}
-        if (ball.y+BALL_R>=PAD_Y && ball.y+BALL_R<=PAD_Y+PAD_H+5 &&
+        if (ball.x-r<0){ball.x=r;ball.vx=Math.abs(ball.vx);audioManager.playSfx(SFX.CARD_FLIP);}
+        if (ball.x+r>W){ball.x=W-r;ball.vx=-Math.abs(ball.vx);audioManager.playSfx(SFX.CARD_FLIP);}
+        if (ball.y-r<0){ball.y=r;ball.vy=Math.abs(ball.vy);audioManager.playSfx(SFX.CARD_FLIP);}
+        if (ball.y+r>=PAD_Y && ball.y+r<=PAD_Y+PAD_H+5 &&
             ball.x>=padX-4 && ball.x<=padX+PAD_W+4 && ball.vy>0) {
             ball.vx=((ball.x-(padX+PAD_W/2))/(PAD_W/2))*5;
-            ball.vy=-Math.abs(ball.vy); ball.y=PAD_Y-BALL_R;
+            ball.vy=-Math.abs(ball.vy); ball.y=PAD_Y-r;
+            ball.charge = Math.max(1, cumItems);  // 패들 복귀 = 풀충전
             audioManager.playSfx(SFX.CARD_PLAY);
         }
+
+        let bounced = false;
         for (const b of bricks) {
             if (!b.alive) continue;
-            if (ball.x+BALL_R>b.x && ball.x-BALL_R<b.x+BRICK_W &&
-                ball.y+BALL_R>b.y && ball.y-BALL_R<b.y+BRICK_H) {
-                b.alive=false; bricksLeft--;
-                leftEl.textContent=`벽돌: ${bricksLeft}`;
+            if (ball.x+r>b.x && ball.x-r<b.x+BRICK_W &&
+                ball.y+r>b.y && ball.y-r<b.y+BRICK_H) {
                 audioManager.playSfx(SFX.CARD_MATCH);
-                if (Math.random() < ITEM_CHANCE)
-                    items.push({ x:b.x+BRICK_W/2, y:b.y+BRICK_H/2, vy:ITEM_SPEED });
-                const ox=Math.min(ball.x+BALL_R-b.x,b.x+BRICK_W-(ball.x-BALL_R));
-                const oy=Math.min(ball.y+BALL_R-b.y,b.y+BRICK_H-(ball.y-BALL_R));
-                if (ox<oy) ball.vx=-ball.vx; else ball.vy=-ball.vy;
-                if (bricksLeft===0) return 'win';
-                break;
+                const result = damageBrick(b);
+                if (result === false) continue;  // 이미 죽은 벽돌
+                if (destroyedCount >= TARGET_KILLS) return 'win';
+
+                // 반사 필요한 케이스: 잔탄 부족(damaged), 잔탄 없음(blocked), 잔탄 소진(destroyed → charge 0)
+                const needsBounce = result === 'damaged' || result === 'blocked' || ball.charge <= 0;
+                if (needsBounce) {
+                    if (!bounced) {
+                        const ox=Math.min(ball.x+r-b.x, b.x+BRICK_W-(ball.x-r));
+                        const oy=Math.min(ball.y+r-b.y, b.y+BRICK_H-(ball.y-r));
+                        if (ox<oy) {
+                            ball.vx=-ball.vx;
+                            // 공이 벽돌 안에 박히지 않도록 x 방향으로 밀어내기
+                            ball.x = (ball.x < b.x + BRICK_W/2) ? b.x - r - 0.5 : b.x + BRICK_W + r + 0.5;
+                        } else {
+                            ball.vy=-ball.vy;
+                            ball.y = (ball.y < b.y + BRICK_H/2) ? b.y - r - 0.5 : b.y + BRICK_H + r + 0.5;
+                        }
+                        bounced=true;
+                    }
+                    break;
+                }
+                // 잔탄 남음 → 계속 관통
             }
         }
-        return ball.y-BALL_R>H;
+        return ball.y-r>H;
     }
 
     function update() {
-        const lost=[];
-        for (let i=0; i<balls.length; i++) {
-            const r=updateBall(balls[i]);
-            if (r==='win') { end(true); return; }
-            if (r===true) lost.push(i);
+        if (destroyedCount >= TARGET_KILLS) { end(true); return; }
+
+        const now = performance.now();
+        const dt = Math.min(0.05, (now - lastFrameTime) / 1000);  // 50ms 안전 클램프
+        lastFrameTime = now;
+
+        // 보충 타이머 (누적 아이템 수에 따라 간격 단축)
+        spawnTimer += dt;
+        const interval = getSpawnInterval(cumItems);
+        if (spawnTimer >= interval) {
+            spawnTimer -= interval;
+            addBrickRow();
         }
-        for (let i=lost.length-1; i>=0; i--) balls.splice(lost[i],1);
-        if (balls.length===0) {
+        // 슬라이드 보간
+        slideBricks(dt);
+        // 위험 라인 도달 시 즉시 게임오버
+        if (isDangerReached()) { end(false); return; }
+
+        const result = updateBall(mainBall);
+        if (result === 'win') { end(true); return; }
+        if (result === true) {
             lives--; livesEl.textContent=`❤️ × ${lives}`;
             audioManager.playSfx(SFX.SHAKE);
             if (lives<=0) { end(false); return; }
-            balls=[{x:W/2, y:H/2-40, vx:3, vy:-3.8}];
-            items=[];
+            mainBall = {x:padX+PAD_W/2, y:PAD_Y-ballR()-1, vx:3, vy:-3.8, charge:Math.max(1, cumItems)};
+            ballHistory = [];
+            items = [];
+            spawnTimer = 0;  // 라이프 차감 시 다음 줄까지 시간 유예
+        } else {
+            ballHistory.unshift({ x:mainBall.x, y:mainBall.y });
+            const trailCap = trailLen() + 2;
+            if (ballHistory.length > trailCap) ballHistory.length = trailCap;
         }
-        ballsEl.textContent=`🔵 × ${balls.length}`;
+        ballsEl.textContent=`⚡ ${mainBall.charge}/${cumItems}`;
 
         // 낙하 아이템 업데이트
         const kept=[];
@@ -669,12 +850,10 @@ function _startBreakout(onWin, onLose, bgImg) {
             it.y+=it.vy;
             if (it.y+ITEM_R>=PAD_Y && it.y-ITEM_R<=PAD_Y+PAD_H &&
                 it.x>=padX-4 && it.x<=padX+PAD_W+4) {
-                // 패들이 아이템 캐치 → 새 공 추가
                 audioManager.playSfx(SFX.COIN);
-                const angle=(Math.random()*0.8-0.4)-Math.PI/2;
-                const spd=3.8;
-                balls.push({x:padX+PAD_W/2, y:PAD_Y-BALL_R-1,
-                            vx:Math.cos(angle)*spd, vy:Math.sin(angle)*spd});
+                cumItems++;
+                // 같은 프레임에 패들 반사가 있었으면 새 cumItems로 즉시 보강
+                if (mainBall.vy < 0) mainBall.charge = Math.max(mainBall.charge, cumItems);
             } else if (it.y+ITEM_R<H) {
                 kept.push(it);
             }
