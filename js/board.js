@@ -8,9 +8,10 @@ import * as Showtime from './showtime.js';
 import * as SlidePuzzle from './slidepuzzle.js';
 import { audioManager, BGM } from './audio.js';
 import {
-    showGomoku, showFishing, showNumberBaseball, showBreakout,
-    showSudoku, showMinesweeper, showArrowDodge, showPickpocket, showTetris, showGwageo,
+    showGomoku, showLaneRunner, showNumberBaseball, showBreakout,
+    showSudoku, showMinesweeper, showSichuan, showPickpocket, showTetris, showGwageo,
 } from './minigames.js';
+import { showEndlessBreakout } from './endless_breakout.js';
 
 // ── 보드 타일 정의 (24칸) ─────────────────────────────────────────────
 export const BOARD_TILES = [
@@ -88,12 +89,12 @@ function getCompletedCollectionCount() {
 // 미니게임 보상
 const MG_REWARDS = {
     gomoku:      { win: 50000, lose: 5000  },
-    fishing:     { win: 35000, lose: 8000  },
+    laneRunner:  { win: 35000, lose: 8000  },
     baseball:    { win: 30000, lose: 5000  },
     breakout:    { win: 40000, lose: 8000  },
     sudoku:      { win: 30000, lose: 5000  },
     minesweeper: { win: 35000, lose: 5000  },
-    arrowdodge:  { win: 40000, lose: 8000  },
+    sichuan:     { win: 40000, lose: 8000  },
     pickpocket:  { win: 35000, lose: 5000  },
     tetris:      { win: 40000, lose: 8000  },
 };
@@ -203,8 +204,26 @@ export function initBoard(onGameStart) {
     rollBtn.onclick = onRollClick;
 
     document.getElementById('board-levelup-btn').onclick = openLevelUpModal;
+    const ebBtn = document.getElementById('board-breakout-btn');
+    if (ebBtn) ebBtn.onclick = onEndlessBreakoutClick;
     updateLevelDisplay();
     startIncomeTimer();
+}
+
+function onEndlessBreakoutClick() {
+    showEndlessBreakout((destroyed) => {
+        const reward = destroyed * 50;
+        Game.setPlayerMoney(Game.playerMoney + reward);
+        UI.updateTotalMoneyDisplay(Game.playerMoney);
+        Game.saveGameData();
+        updateBoardInfo();
+        UI.showModal(
+            '벽돌깨기 종료',
+            destroyed > 0
+                ? `${destroyed}개 격파! +${reward.toLocaleString()}냥`
+                : '벽돌을 한 개도 못 깼습니다.'
+        );
+    });
 }
 
 // ── 새 턴 시작 (게임 복귀 후 호출) ────────────────────────────────────
@@ -641,11 +660,11 @@ function landOnTile(pos) {
         return;
     }
 
-    // ── 기연: 낚시 (2명 수집 완료) / 패 3장 뒤집기 ──────────────────
+    // ── 기연: 갈래길 러너 (2명 수집 완료) / 패 3장 뒤집기 ───────────
     if (tile.type === 'giyeon') {
         if (getCompletedCollectionCount() >= 2) {
-            UI.showModal('기연 — 낚시', `기연의 인연으로 낚시터에서 도전!\n60초 안에 5마리를 잡으면 +${scaleMoney(35000).toLocaleString()}냥, 실패하면 -${scaleMoney(8000).toLocaleString()}냥`,
-                () => showFishing(() => applyMgResult(true, 'fishing'), () => applyMgResult(false, 'fishing'))
+            UI.showModal('기연 — 갈래길 러너', `기연이 운명의 갈림길로 인도합니다!\n30초 안에 좌/우 차선을 잘 골라 200점 모으면 +${scaleMoney(35000).toLocaleString()}냥, 실패하면 -${scaleMoney(8000).toLocaleString()}냥`,
+                () => showLaneRunner(() => applyMgResult(true, 'laneRunner'), () => applyMgResult(false, 'laneRunner'))
             );
             return;
         }
@@ -735,11 +754,11 @@ function landOnTile(pos) {
         return;
     }
 
-    // ── 방랑객: 화살피하기 (7명 수집 완료) / 보따리 2개 선택 ─────────
+    // ── 방랑객: 사천성 (7명 수집 완료) / 보따리 2개 선택 ─────────
     if (tile.type === 'bangnanggaek') {
         if (getCompletedCollectionCount() >= 7) {
-            UI.showModal('방랑객 — 화살피하기', `방랑객이 위험한 내기를 겁니다!\n30초 동안 화살을 피하면 +${scaleMoney(40000).toLocaleString()}냥, 모두 맞으면 -${scaleMoney(8000).toLocaleString()}냥`,
-                () => showArrowDodge(() => applyMgResult(true, 'arrowdodge'), () => applyMgResult(false, 'arrowdodge'))
+            UI.showModal('방랑객 — 사천성', `방랑객이 화투패로 내기를 겁니다!\n120초 안에 모든 패를 짝맞추면 +${scaleMoney(40000).toLocaleString()}냥, 못 맞추면 -${scaleMoney(8000).toLocaleString()}냥`,
+                () => showSichuan(() => applyMgResult(true, 'sichuan'), () => applyMgResult(false, 'sichuan'))
             );
             return;
         }

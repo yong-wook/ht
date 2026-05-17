@@ -1,4 +1,4 @@
-// js/minigames.js
+﻿// js/minigames.js
 // 보드 타일 컬렉션 해금 미니게임 8종
 import * as Game from './game.js';
 import { audioManager, SFX } from './audio.js';
@@ -202,212 +202,230 @@ export function showGomoku(onWin, onLose) {
     });
 }
 
-// ─── 2. 낚시 (Fishing) — 찌 타이밍 방식 ────────────────────────────────────
-export function showFishing(onWin, onLose) {
-    const W = 400, H = 280;
-    const TARGET = 5, TIME_LIMIT = 60;
-    const WATER_Y = H * 0.44;
-    const ROD_X = W * 0.28, ROD_Y = 28;
-    const BOB_X  = W * 0.62;
+// ─── 2. 갈래길 러너 (Lane Runner) — 좌/우 차선 선택형 러너 ───────────────────
+export function showLaneRunner(onWin, onLose) {
+    const W = 360, H = 480;
+    const TIME_LIMIT = 30;
+    const TARGET_SCORE = 200;
+    const LANE_LEFT = 90, LANE_RIGHT = 270;
+    const PLAYER_Y = H - 90;
+    const SPAWN_INTERVAL = 580;
 
-    // 상태
-    const S = { IDLE: 0, NIBBLE: 1, BITE: 2, CAUGHT: 3, MISS: 4 };
+    const ITEMS_GOOD = [
+        { score:  15, emoji: '💰', color: '#ffd966' },
+        { score:  30, emoji: '💎', color: '#7adcff' },
+    ];
+    const ITEMS_BAD = [
+        { score: -10, emoji: '💥', color: '#ff7a7a' },
+        { score: -25, emoji: '🔥', color: '#ff4040' },
+    ];
+
+    function pickSide() {
+        const r = Math.random();
+        if (r < 0.30) return null;                          // 30% 빈 칸
+        if (r < 0.65) return ITEMS_GOOD[Math.random() < 0.75 ? 0 : 1];  // 35% 좋음
+        return ITEMS_BAD[Math.random() < 0.70 ? 0 : 1];      // 35% 나쁨
+    }
 
     const ov = buildOverlay();
     const box = document.createElement('div');
     box.className = 'bm-box mg-box';
     box.innerHTML = `
-        <h3 class="bm-title">🎣 낚시</h3>
+        <h3 class="bm-title">🏃 갈래길 러너</h3>
         <div class="mg-info-row">
-            <span id="mg-fish-count">🐟 0 / ${TARGET}</span>
-            <span id="mg-fish-timer">⏱ ${TIME_LIMIT}</span>
+            <span id="lr-score">⭐ 0 / ${TARGET_SCORE}</span>
+            <span id="lr-timer">⏱ ${TIME_LIMIT}</span>
         </div>
-        <canvas id="mg-fishing-canvas" width="${W}" height="${H}"
-            style="cursor:pointer; border-radius:8px; display:block; margin:0 auto;"></canvas>
-        <p class="mg-hint">찌가 쑥 잠기는 순간 클릭! (Space 가능)</p>
+        <canvas id="mg-lr-canvas" width="${W}" height="${H}"
+            style="cursor:pointer; border-radius:8px; display:block; margin:0 auto; touch-action:none;"></canvas>
+        <p class="mg-hint">화면 좌/우 또는 ← →로 차선 이동. ${TIME_LIMIT}초 안에 ${TARGET_SCORE}점 모으세요!</p>
     `;
     ov.appendChild(box);
 
-    const canvas  = box.querySelector('#mg-fishing-canvas');
+    const canvas  = box.querySelector('#mg-lr-canvas');
     const ctx     = canvas.getContext('2d');
-    const countEl = box.querySelector('#mg-fish-count');
-    const timerEl = box.querySelector('#mg-fish-timer');
+    const scoreEl = box.querySelector('#lr-score');
+    const timerEl = box.querySelector('#lr-timer');
 
-    let caught = 0, timeLeft = TIME_LIMIT, gameOver = false, animId;
-    let state = S.IDLE, stateEnd = 0;
-    let bobDip = 0;
+    let score = 0;
+    let timeLeft = TIME_LIMIT;
+    let gameOver = false;
+    let animId;
+    let lane = 0;
+    let playerX = LANE_LEFT;
+    const items = [];
+    let lastSpawn = performance.now();
+    let scrollSpeed = 3.4;
+    let bgOffset = 0;
+    let stepBounce = 0;
     let fbText = '', fbColor = '#fff', fbAlpha = 0;
+    let flashTimer = 0;
+    let flashColor = '';
 
-    const FISH_EMOJIS = ['🐟','🐠','🐡','🐟','🐠'];
-    const fishes = Array.from({length: 5}, () => spawnFish());
-    let hookFish = null;
-
-    function spawnFish() {
-        return {
-            emoji: FISH_EMOJIS[Math.floor(Math.random() * FISH_EMOJIS.length)],
-            x: Math.random() * W,
-            y: WATER_Y + 25 + Math.random() * (H - WATER_Y - 50),
-            vx: (Math.random() - 0.5) * 1.8,
-            vy: (Math.random() - 0.5) * 0.5,
-            size: 20,
-        };
+    function setLane(side) { if (!gameOver) lane = side; }
+    function onTap(e) {
+        if (gameOver) return;
+        if (e.preventDefault) e.preventDefault();
+        const r = canvas.getBoundingClientRect();
+        const t = e.touches && e.touches.length ? e.touches[0] : e;
+        const x = (t.clientX - r.left) * (W / r.width);
+        setLane(x < W / 2 ? 0 : 1);
     }
-
-    function go(newState) {
-        state = newState;
-        const now = performance.now();
-        if (newState === S.IDLE) {
-            stateEnd = now + 1800 + Math.random() * 2800;
-            hookFish = null;
-        } else if (newState === S.NIBBLE) {
-            stateEnd = now + 600 + Math.random() * 700;
-            hookFish = fishes.reduce((a, b) =>
-                Math.hypot(a.x - BOB_X, a.y - (WATER_Y + 50)) <
-                Math.hypot(b.x - BOB_X, b.y - (WATER_Y + 50)) ? a : b
-            );
-        } else if (newState === S.BITE) {
-            stateEnd = now + 650 + Math.random() * 400;
-        } else if (newState === S.CAUGHT) {
-            stateEnd = now + 950;
-            fbText = '낚았다! 🎉'; fbColor = '#7ef7a0'; fbAlpha = 1;
-            caught++;
-            countEl.textContent = `🐟 ${caught} / ${TARGET}`;
-            if (caught >= TARGET) { setTimeout(() => end(true), 750); return; }
-        } else if (newState === S.MISS) {
-            stateEnd = now + 850;
-            fbText = '놓쳤다...'; fbColor = '#f99'; fbAlpha = 1;
-        }
+    function onKey(e) {
+        if (gameOver) return;
+        if (e.code === 'ArrowLeft'  || e.code === 'KeyA') { e.preventDefault(); setLane(0); }
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); setLane(1); }
     }
-
-    function onInput() {
-        if (gameOver || state === S.CAUGHT || state === S.MISS) return;
-        if (state === S.BITE) go(S.CAUGHT);
-        else go(S.MISS);
-    }
-
-    canvas.addEventListener('click', onInput);
-    function onKey(e) { if (e.code === 'Space') { e.preventDefault(); onInput(); } }
+    canvas.addEventListener('mousedown', onTap);
+    canvas.addEventListener('touchstart', onTap, { passive: false });
     document.addEventListener('keydown', onKey);
 
-    let lastT = performance.now();
+    function spawnLine() {
+        const l = pickSide();
+        const r = pickSide();
+        if (l) items.push({ x: LANE_LEFT,  y: -30, item: l });
+        if (r) items.push({ x: LANE_RIGHT, y: -30, item: r });
+    }
 
     function loop(now) {
         if (gameOver) return;
-        lastT = now;
 
-        // 상태 전환
-        if (now >= stateEnd) {
-            if (state === S.IDLE)   go(S.NIBBLE);
-            else if (state === S.NIBBLE) go(S.BITE);
-            else if (state === S.BITE)   go(S.MISS);
-            else if (state === S.CAUGHT || state === S.MISS) go(S.IDLE);
+        scrollSpeed = 3.4 + (TIME_LIMIT - timeLeft) * 0.06; // 후반 가속
+        const targetX = lane === 0 ? LANE_LEFT : LANE_RIGHT;
+        playerX += (targetX - playerX) * 0.22;
+        bgOffset = (bgOffset + scrollSpeed) % 32;
+        stepBounce += scrollSpeed * 0.15;
+
+        for (let i = items.length - 1; i >= 0; i--) {
+            const it = items[i];
+            it.y += scrollSpeed;
+            if (Math.abs(it.y - PLAYER_Y) < 24 && Math.abs(it.x - playerX) < 34) {
+                score = Math.max(0, score + it.item.score);
+                scoreEl.textContent = `⭐ ${score} / ${TARGET_SCORE}`;
+                fbText = (it.item.score > 0 ? '+' : '') + it.item.score;
+                fbColor = it.item.score > 0 ? '#7ef7a0' : '#ff8a8a';
+                flashColor = it.item.score > 0 ? 'rgba(127,247,160,0.22)' : 'rgba(255,80,80,0.3)';
+                flashTimer = 8; fbAlpha = 1;
+                try { audioManager.playSfx(it.item.score > 0 ? SFX.COIN : SFX.BOMB); } catch (e) {}
+                items.splice(i, 1);
+                if (score >= TARGET_SCORE) { setTimeout(() => end(true), 450); return; }
+                continue;
+            }
+            if (it.y > H + 40) items.splice(i, 1);
         }
 
-        // 찌 침강
-        const dipTarget = (state === S.BITE || state === S.CAUGHT) ? 30 : 0;
-        bobDip += (dipTarget - bobDip) * 0.2;
+        if (now - lastSpawn >= SPAWN_INTERVAL) {
+            spawnLine();
+            lastSpawn = now;
+        }
 
-        // 물고기 이동
-        fishes.forEach(f => {
-            if (f === hookFish && (state === S.NIBBLE || state === S.BITE)) {
-                f.x += (BOB_X - f.x) * 0.06;
-                f.y += (WATER_Y + 55 - f.y) * 0.06;
-            } else {
-                f.x += f.vx; f.y += f.vy;
-                if (f.x < -30) f.x = W + 30;
-                if (f.x > W + 30) f.x = -30;
-                if (f.y < WATER_Y + 12 || f.y > H - 12) f.vy *= -1;
-            }
-        });
-
-        if (fbAlpha > 0) fbAlpha = Math.max(0, fbAlpha - 0.018);
+        if (fbAlpha > 0) fbAlpha = Math.max(0, fbAlpha - 0.013);
+        if (flashTimer > 0) flashTimer--;
 
         draw(now);
         animId = requestAnimationFrame(loop);
     }
 
-    function draw(now) {
-        // 하늘
-        const sky = ctx.createLinearGradient(0, 0, 0, WATER_Y);
-        sky.addColorStop(0, '#87ceeb'); sky.addColorStop(1, '#c8eaf8');
-        ctx.fillStyle = sky; ctx.fillRect(0, 0, W, WATER_Y);
+    function draw() {
+        // 배경
+        const bg = ctx.createLinearGradient(0, 0, 0, H);
+        bg.addColorStop(0, '#1a2540');
+        bg.addColorStop(1, '#0d1428');
+        ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-        // 물
-        const sea = ctx.createLinearGradient(0, WATER_Y, 0, H);
-        sea.addColorStop(0, '#1a6fa0'); sea.addColorStop(1, '#0a3a5c');
-        ctx.fillStyle = sea; ctx.fillRect(0, WATER_Y, W, H - WATER_Y);
+        // 차선 영역
+        ctx.fillStyle = 'rgba(40,70,110,0.25)';
+        ctx.fillRect(W * 0.04, 0, W * 0.46, H);
+        ctx.fillStyle = 'rgba(60,55,110,0.25)';
+        ctx.fillRect(W * 0.50, 0, W * 0.46, H);
 
-        // 수면 반짝임
-        ctx.fillStyle = 'rgba(255,255,255,0.07)';
-        [20, 90, 160, 240, 320].forEach((x, i) =>
-            ctx.fillRect(x, WATER_Y + 5 + (i % 2) * 14, 50, 4)
-        );
+        // 스크롤 줄무늬
+        ctx.fillStyle = 'rgba(255,255,255,0.04)';
+        for (let y = -32 + bgOffset; y < H; y += 32) {
+            ctx.fillRect(W * 0.04, y, W * 0.92, 14);
+        }
 
-        // 낚싯대
-        ctx.strokeStyle = '#7a3b0a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(ROD_X - 55, H * 0.04); ctx.lineTo(ROD_X, ROD_Y); ctx.stroke();
+        // 중앙 점선
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([14, 12]);
+        ctx.lineDashOffset = -bgOffset;
+        ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+        ctx.setLineDash([]);
 
-        // 낚싯줄
-        const bobY = WATER_Y + bobDip + Math.sin(now * 0.002) * (state === S.IDLE ? 2 : 0);
-        ctx.strokeStyle = 'rgba(220,220,220,0.7)'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(ROD_X, ROD_Y); ctx.lineTo(BOB_X, bobY); ctx.stroke();
-
-        // 찌 흔들림
-        const nib = state === S.NIBBLE ? Math.sin(now * 0.025) * 4 : 0;
-
-        // 찌 막대
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.fillRect(BOB_X - 1.5, bobY - 14 + nib, 3, 14);
-
-        // 찌 몸통
-        const bobColor = state === S.BITE    ? '#ff3333'
-                       : state === S.NIBBLE  ? '#ffaa00'
-                       : state === S.CAUGHT  ? '#44dd66'
-                       :                       '#ff7766';
+        // 외곽
+        ctx.strokeStyle = 'rgba(150,180,220,0.4)';
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.ellipse(BOB_X, bobY + 5 + nib, 7, 11, 0, 0, Math.PI * 2);
-        ctx.fillStyle = bobColor; ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(BOB_X, bobY + 9 + nib, 7, 5, 0, 0, Math.PI);
-        ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill();
+        ctx.moveTo(W * 0.04, 0); ctx.lineTo(W * 0.04, H);
+        ctx.moveTo(W * 0.96, 0); ctx.lineTo(W * 0.96, H);
+        ctx.stroke();
 
-        // 물고기
-        fishes.forEach(f => {
-            ctx.save(); ctx.translate(f.x, f.y);
-            const goLeft = f.vx < 0 || (f === hookFish && BOB_X < f.x);
-            if (goLeft) ctx.scale(-1, 1);
-            ctx.font = `${f.size}px serif`;
+        // 아이템
+        for (const it of items) {
+            ctx.fillStyle = it.item.color;
+            ctx.beginPath();
+            ctx.arc(it.x, it.y, 22, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 2; ctx.stroke();
+
+            ctx.font = '24px serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(f.emoji, 0, 0);
-            ctx.restore();
-        });
+            ctx.fillText(it.item.emoji, it.x, it.y);
 
-        // 상태 힌트
-        const hint = state === S.IDLE    ? '대기 중...'
-                   : state === S.NIBBLE  ? '찌가 흔들립니다...'
-                   : state === S.BITE    ? '지금!'
-                   : '';
-        const hintColor = state === S.BITE   ? `rgba(255,${80 + Math.floor(Math.sin(now*0.025)*80)},50,1)`
-                        : state === S.NIBBLE ? '#ffcc44'
-                        :                      'rgba(255,255,255,0.45)';
-        ctx.font = 'bold 15px sans-serif';
-        ctx.textAlign = 'center'; ctx.fillStyle = hintColor;
-        ctx.fillText(hint, W / 2, H - 14);
+            ctx.font = 'bold 13px sans-serif';
+            const label = (it.item.score > 0 ? '+' : '') + it.item.score;
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+            ctx.fillStyle = '#fff';
+            ctx.strokeText(label, it.x, it.y + 30);
+            ctx.fillText(label, it.x, it.y + 30);
+        }
 
-        // 피드백
+        // 플레이어
+        const bounce = Math.sin(stepBounce) * 3;
+        ctx.save();
+        ctx.translate(playerX, PLAYER_Y);
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.beginPath();
+        ctx.ellipse(0, 22, 20, 5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.font = '40px serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('🏃', 0, -8 + bounce);
+        ctx.restore();
+
+        // 플래시
+        if (flashTimer > 0) {
+            ctx.fillStyle = flashColor;
+            ctx.fillRect(0, 0, W, H);
+        }
+
+        // 점수 게이지
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.fillRect(10, 8, W - 20, 6);
+        const pct = Math.min(1, score / TARGET_SCORE);
+        const grd = ctx.createLinearGradient(10, 0, W - 10, 0);
+        grd.addColorStop(0, '#7ef7a0'); grd.addColorStop(1, '#4ade80');
+        ctx.fillStyle = grd;
+        ctx.fillRect(10, 8, (W - 20) * pct, 6);
+
+        // 피드백 텍스트
         if (fbAlpha > 0) {
+            ctx.save();
             ctx.globalAlpha = fbAlpha;
-            ctx.font = 'bold 20px sans-serif';
+            ctx.font = 'bold 28px sans-serif';
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
             ctx.fillStyle = fbColor; ctx.textAlign = 'center';
-            ctx.fillText(fbText, W / 2, WATER_Y - 16);
-            ctx.globalAlpha = 1;
+            const fbY = PLAYER_Y - 55;
+            ctx.strokeText(fbText, playerX, fbY);
+            ctx.fillText(fbText, playerX, fbY);
+            ctx.restore();
         }
     }
 
     const timerIv = setInterval(() => {
         if (gameOver) return;
-        timerEl.textContent = `⏱ ${--timeLeft}`;
-        if (timeLeft <= 0) end(false);
+        timeLeft--;
+        timerEl.textContent = `⏱ ${timeLeft}`;
+        if (timeLeft <= 0) end(score >= TARGET_SCORE);
     }, 1000);
 
     function end(won) {
@@ -418,9 +436,9 @@ export function showFishing(onWin, onLose) {
         setTimeout(() => closeOverlay(ov, won ? onWin : onLose), 700);
     }
 
-    go(S.IDLE);
     animId = requestAnimationFrame(loop);
 }
+
 
 // ─── 3. 숫자야구 (Number Baseball) ────────────────────────────────────────────
 export function showNumberBaseball(onWin, onLose) {
@@ -1400,106 +1418,300 @@ export function showMinesweeper(onWin, onLose) {
     init(); render();
 }
 
-// ─── 7. 화살피하기 (Arrow Dodge) ──────────────────────────────────────────────
-export function showArrowDodge(onWin, onLose) {
-    const W=400, H=260, TIME_LIMIT=30, LIVES=3, PR=14, INVULN=60;
+// ─── 7. 사천성 (Sichuan / Shisen-Sho) ─────────────────────────────────────────
+export function showSichuan(onWin, onLose) {
+    const ROWS = 6, COLS = 8;
+    const TILE_W = 36, TILE_H = 52;
+    const TIME_LIMIT = 120;
+    const TOTAL_TILES = ROWS * COLS;
+    const NUM_TYPES = 12;
+    const PER_TYPE = TOTAL_TILES / NUM_TYPES;
 
-    const ov=buildOverlay();
-    const box=document.createElement('div');
-    box.className='bm-box mg-box';
-    box.innerHTML=`
-        <h3 class="bm-title">🏹 화살피하기</h3>
+    // 12개월 대표 화투 이미지 (각 월에서 가장 대표적인 카드 한 장씩)
+    const MONTH_IMAGES = [
+        'images/cards/01_gwang.jpg',
+        'images/cards/02_ggot.jpg',
+        'images/cards/03_gwang.jpg',
+        'images/cards/04_ggot.jpg',
+        'images/cards/05_ggot.jpg',
+        'images/cards/06_ggot.jpg',
+        'images/cards/07_ggot.jpg',
+        'images/cards/08_gwang.jpg',
+        'images/cards/09_ggot.jpg',
+        'images/cards/10_ggot.jpg',
+        'images/cards/11_gwang.jpg',
+        'images/cards/12_gwang.jpg',
+    ];
+
+    const BOARD_W = COLS * TILE_W;
+    const BOARD_H = ROWS * TILE_H;
+
+    const ov = buildOverlay();
+    const box = document.createElement('div');
+    box.className = 'bm-box mg-box mg-sc-wrap';
+    box.innerHTML = `
+        <h3 class="bm-title">🀄 사천성</h3>
         <div class="mg-info-row">
-            <span id="ad-lives">❤️ × ${LIVES}</span>
-            <span id="ad-timer">⏱ ${TIME_LIMIT}</span>
+            <span id="sc-timer">⏱ ${TIME_LIMIT}</span>
+            <span id="sc-left">남은 패: ${TOTAL_TILES}</span>
+            <button id="sc-shuffle" class="mg-mode-btn">🔀 섞기</button>
         </div>
-        <canvas id="mg-arrow-canvas" width="${W}" height="${H}"
-            style="display:block; margin:0 auto; cursor:none; border-radius:6px;"></canvas>
-        <p class="mg-hint">마우스로 피하세요! ${TIME_LIMIT}초 생존하면 승리!</p>
+        <div class="mg-sc-board" style="width:${BOARD_W}px; height:${BOARD_H}px;">
+            <div class="mg-sc-grid" id="sc-grid"
+                style="grid-template-columns:repeat(${COLS},${TILE_W}px);
+                       grid-template-rows:repeat(${ROWS},${TILE_H}px);"></div>
+            <canvas class="mg-sc-canvas" id="sc-canvas"
+                width="${BOARD_W}" height="${BOARD_H}"></canvas>
+        </div>
+        <p class="mg-hint">같은 그림 두 장을 골라 짝맞추세요. 경로는 직선 + 최대 2번 꺾임.</p>
     `;
     ov.appendChild(box);
 
-    const canvas  = box.querySelector('#mg-arrow-canvas');
-    const ctx     = canvas.getContext('2d');
-    const livesEl = box.querySelector('#ad-lives');
-    const timerEl = box.querySelector('#ad-timer');
+    const gridEl    = box.querySelector('#sc-grid');
+    const canvas    = box.querySelector('#sc-canvas');
+    const ctx       = canvas.getContext('2d');
+    const timerEl   = box.querySelector('#sc-timer');
+    const leftEl    = box.querySelector('#sc-left');
+    const shuffleBtn= box.querySelector('#sc-shuffle');
 
-    let lives=LIVES, timeLeft=TIME_LIMIT, gameOver=false, animId, invuln=0, frame=0;
-    let mx=W/2, my=H/2;
-    const arrows=[];
+    // 보드 상태: 0 = 비어있음, 1..NUM_TYPES = 타일 종류
+    const board = Array.from({length: ROWS}, () => new Array(COLS).fill(0));
+    let remaining = TOTAL_TILES;
+    let timeLeft  = TIME_LIMIT;
+    let gameOver  = false;
+    let selected  = null; // {r, c}
+    let timerIv;
 
-    canvas.addEventListener('mousemove', e => {
-        const r=canvas.getBoundingClientRect();
-        mx=(e.clientX-r.left)*(W/r.width); my=(e.clientY-r.top)*(H/r.height);
-    });
-    canvas.addEventListener('touchmove', e => {
-        e.preventDefault();
-        const r=canvas.getBoundingClientRect();
-        mx=(e.touches[0].clientX-r.left)*(W/r.width); my=(e.touches[0].clientY-r.top)*(H/r.height);
-    }, {passive:false});
-
-    function spawn() {
-        const side=Math.floor(Math.random()*4);
-        let x,y,angle;
-        if (side===0){x=Math.random()*W;y=-20;angle=Math.PI/2+(Math.random()-.5)*0.9;}
-        else if(side===1){x=W+20;y=Math.random()*H;angle=Math.PI+(Math.random()-.5)*0.9;}
-        else if(side===2){x=Math.random()*W;y=H+20;angle=-Math.PI/2+(Math.random()-.5)*0.9;}
-        else{x=-20;y=Math.random()*H;angle=(Math.random()-.5)*0.9;}
-        const spd=3+Math.random()*2+(TIME_LIMIT-timeLeft)*0.13;
-        arrows.push({x,y,angle,spd});
+    // ── 경로 탐색 (외곽 한 칸 패딩 포함) ─────────────────────────
+    function cellEmpty(r, c) {
+        if (r >= 0 && r < ROWS && c >= 0 && c < COLS) return board[r][c] === 0;
+        // 외곽 한 칸은 통로
+        return r >= -1 && r <= ROWS && c >= -1 && c <= COLS;
     }
-
-    const timerIv=setInterval(()=>{
-        if (gameOver) return;
-        timerEl.textContent=`⏱ ${--timeLeft}`;
-        if (timeLeft<=0){
-            gameOver=true; cancelAnimationFrame(animId); clearInterval(timerIv);
-            timerEl.textContent='⏱ 생존!'; timerEl.style.color='#4cff4c';
-            setTimeout(()=>closeOverlay(ov,onWin),800);
+    function rowClear(r, c1, c2) {
+        const lo = Math.min(c1, c2), hi = Math.max(c1, c2);
+        for (let c = lo + 1; c < hi; c++) if (!cellEmpty(r, c)) return false;
+        return true;
+    }
+    function colClear(c, r1, r2) {
+        const lo = Math.min(r1, r2), hi = Math.max(r1, r2);
+        for (let r = lo + 1; r < hi; r++) if (!cellEmpty(r, c)) return false;
+        return true;
+    }
+    function uniquePath(pts) {
+        const out = [];
+        for (const p of pts) {
+            const last = out[out.length - 1];
+            if (!last || last[0] !== p[0] || last[1] !== p[1]) out.push(p);
         }
-    },1000);
+        return out;
+    }
+    function findPath(a, b) {
+        // a, b를 경로 검사 동안 임시로 비움 (양 끝점)
+        const sa = board[a.r][a.c], sb = board[b.r][b.c];
+        board[a.r][a.c] = 0; board[b.r][b.c] = 0;
 
-    function loop() {
-        if (gameOver) return; frame++;
-        if (invuln > 0) invuln--;
-        const rate=Math.max(15,42-Math.floor((TIME_LIMIT-timeLeft)/2));
-        if (frame%rate===0) spawn();
-
-        for (let i=arrows.length-1;i>=0;i--) {
-            const a=arrows[i];
-            a.x+=Math.cos(a.angle)*a.spd; a.y+=Math.sin(a.angle)*a.spd;
-            if (a.x<-80||a.x>W+80||a.y<-80||a.y>H+80){arrows.splice(i,1);continue;}
-            if (invuln>0){continue;}
-            const dx=a.x-mx, dy=a.y-my;
-            if (dx*dx+dy*dy<(PR+5)*(PR+5)) {
-                arrows.splice(i,1); lives--; invuln=INVULN;
-                livesEl.textContent=`❤️ × ${lives}`;
-                if (lives<=0){gameOver=true;cancelAnimationFrame(animId);clearInterval(timerIv);setTimeout(()=>closeOverlay(ov,onLose),600);return;}
+        let result = null;
+        // 중간 행 r 경유: a → (r, a.c) → (r, b.c) → b
+        for (let r = -1; r <= ROWS; r++) {
+            if (!cellEmpty(r, a.c) || !cellEmpty(r, b.c)) continue;
+            if (!colClear(a.c, a.r, r)) continue;
+            if (!colClear(b.c, b.r, r)) continue;
+            if (!rowClear(r, a.c, b.c)) continue;
+            result = uniquePath([[a.r, a.c], [r, a.c], [r, b.c], [b.r, b.c]]);
+            break;
+        }
+        // 중간 열 c 경유: a → (a.r, c) → (b.r, c) → b
+        if (!result) {
+            for (let c = -1; c <= COLS; c++) {
+                if (!cellEmpty(a.r, c) || !cellEmpty(b.r, c)) continue;
+                if (!rowClear(a.r, a.c, c)) continue;
+                if (!rowClear(b.r, b.c, c)) continue;
+                if (!colClear(c, a.r, b.r)) continue;
+                result = uniquePath([[a.r, a.c], [a.r, c], [b.r, c], [b.r, b.c]]);
+                break;
             }
         }
 
-        ctx.fillStyle='#1a2a3a'; ctx.fillRect(0,0,W,H);
-        ctx.strokeStyle='rgba(100,150,200,0.08)'; ctx.lineWidth=1;
-        for (let i=0;i<W;i+=44){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,H);ctx.stroke();}
-        for (let j=0;j<H;j+=44){ctx.beginPath();ctx.moveTo(0,j);ctx.lineTo(W,j);ctx.stroke();}
-
-        arrows.forEach(a=>{
-            ctx.save(); ctx.translate(a.x,a.y); ctx.rotate(a.angle);
-            ctx.strokeStyle='#ff8844'; ctx.fillStyle='#ff8844'; ctx.lineWidth=3;
-            ctx.beginPath(); ctx.moveTo(-20,0); ctx.lineTo(20,0); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(20,0); ctx.lineTo(12,-5); ctx.lineTo(12,5); ctx.closePath(); ctx.fill();
-            ctx.restore();
-        });
-
-        // Player (blink when invulnerable)
-        if (!(invuln>0 && Math.floor(invuln/6)%2===0)) {
-            ctx.font=`${PR*2}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
-            ctx.fillText('🧍',mx,my);
-        }
-
-        animId=requestAnimationFrame(loop);
+        board[a.r][a.c] = sa; board[b.r][b.c] = sb;
+        return result;
     }
-    loop();
+
+    // 남은 패 중 연결 가능한 쌍이 존재하는지
+    function hasAnyMatch() {
+        const cells = [];
+        for (let r = 0; r < ROWS; r++)
+            for (let c = 0; c < COLS; c++)
+                if (board[r][c] !== 0) cells.push({r, c, t: board[r][c]});
+        for (let i = 0; i < cells.length; i++) {
+            for (let j = i + 1; j < cells.length; j++) {
+                if (cells[i].t !== cells[j].t) continue;
+                if (findPath(cells[i], cells[j])) return true;
+            }
+        }
+        return false;
+    }
+
+    function shuffleBoard() {
+        const tiles = [];
+        for (let r = 0; r < ROWS; r++)
+            for (let c = 0; c < COLS; c++)
+                if (board[r][c] !== 0) tiles.push(board[r][c]);
+        for (let i = tiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+        }
+        let k = 0;
+        for (let r = 0; r < ROWS; r++)
+            for (let c = 0; c < COLS; c++)
+                if (board[r][c] !== 0) board[r][c] = tiles[k++];
+    }
+    function ensureSolvable() {
+        // 12종 × 4장 = 48장 환경에서는 풀이 가능 배치가 압도적으로 흔하므로
+        // 캡 없이 매치 가능한 분배가 나올 때까지 반복 (실제로는 1~2회 내 종료).
+        while (remaining > 0 && !hasAnyMatch()) shuffleBoard();
+    }
+
+    // 초기 분배
+    (function initBoard() {
+        const tiles = [];
+        for (let t = 1; t <= NUM_TYPES; t++)
+            for (let k = 0; k < PER_TYPE; k++) tiles.push(t);
+        for (let i = tiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+        }
+        for (let r = 0; r < ROWS; r++)
+            for (let c = 0; c < COLS; c++)
+                board[r][c] = tiles[r * COLS + c];
+        ensureSolvable();
+    })();
+
+    // ── 렌더링 ────────────────────────────────────────────────
+    const cellEls = Array.from({length: ROWS}, () => new Array(COLS));
+    function buildCells() {
+        gridEl.innerHTML = '';
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const el = document.createElement('div');
+                el.className = 'mg-sc-cell';
+                el.dataset.r = r; el.dataset.c = c;
+                el.addEventListener('click', () => onCellClick(r, c));
+                gridEl.appendChild(el);
+                cellEls[r][c] = el;
+            }
+        }
+        refreshCells();
+    }
+    function refreshCells() {
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const el = cellEls[r][c];
+                const v = board[r][c];
+                if (v === 0) {
+                    el.classList.add('mg-sc-empty');
+                    el.style.backgroundImage = '';
+                } else {
+                    el.classList.remove('mg-sc-empty');
+                    el.style.backgroundImage = `url('${MONTH_IMAGES[v - 1]}')`;
+                }
+                el.classList.toggle('mg-sc-selected',
+                    !!selected && selected.r === r && selected.c === c);
+            }
+        }
+    }
+    function drawPath(path) {
+        ctx.clearRect(0, 0, BOARD_W, BOARD_H);
+        if (!path || path.length < 2) return;
+        ctx.strokeStyle = '#ffe14a';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = 'rgba(255,225,74,0.8)';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        for (let i = 0; i < path.length; i++) {
+            const [r, c] = path[i];
+            // -1/ROWS/COLS 외곽 경유 시 경계로 클리핑
+            const cx = Math.max(0, Math.min(BOARD_W, c * TILE_W + TILE_W / 2));
+            const cy = Math.max(0, Math.min(BOARD_H, r * TILE_H + TILE_H / 2));
+            if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    }
+    function clearPath() { ctx.clearRect(0, 0, BOARD_W, BOARD_H); }
+
+    // ── 입력 처리 ─────────────────────────────────────────────
+    function onCellClick(r, c) {
+        if (gameOver) return;
+        if (board[r][c] === 0) return;
+        if (selected && selected.r === r && selected.c === c) {
+            selected = null; refreshCells(); return;
+        }
+        if (!selected) {
+            selected = {r, c}; refreshCells(); return;
+        }
+        if (board[selected.r][selected.c] !== board[r][c]) {
+            selected = {r, c}; refreshCells(); return;
+        }
+        const path = findPath(selected, {r, c});
+        if (!path) {
+            // 매치 불가
+            selected = {r, c}; refreshCells(); return;
+        }
+        // 매치 성공
+        drawPath(path);
+        try { audioManager.playSfx(SFX.CARD_MATCH); } catch (e) {}
+        const a = selected;
+        selected = null;
+        setTimeout(() => {
+            board[a.r][a.c] = 0;
+            board[r][c]     = 0;
+            remaining -= 2;
+            leftEl.textContent = `남은 패: ${remaining}`;
+            refreshCells();
+            clearPath();
+            if (remaining === 0) {
+                gameOver = true;
+                clearInterval(timerIv);
+                timerEl.textContent = '⏱ 클리어!';
+                timerEl.style.color = '#4cff4c';
+                setTimeout(() => closeOverlay(ov, onWin), 700);
+                return;
+            }
+            // 데드락 자동 셔플
+            if (!hasAnyMatch()) {
+                shuffleBoard();
+                ensureSolvable();
+                refreshCells();
+            }
+        }, 280);
+    }
+
+    shuffleBtn.addEventListener('click', () => {
+        if (gameOver) return;
+        selected = null;
+        shuffleBoard();
+        ensureSolvable();
+        refreshCells();
+        clearPath();
+    });
+
+    timerIv = setInterval(() => {
+        if (gameOver) return;
+        timeLeft--;
+        timerEl.textContent = `⏱ ${timeLeft}`;
+        if (timeLeft <= 0) {
+            gameOver = true;
+            clearInterval(timerIv);
+            timerEl.textContent = '⏱ 시간 종료';
+            timerEl.style.color = '#ff7070';
+            setTimeout(() => closeOverlay(ov, onLose), 700);
+        }
+    }, 1000);
+
+    buildCells();
 }
 
 // ─── 8. 소매치기 포위 작전 (Surround the Thief) ──────────────────────────────
