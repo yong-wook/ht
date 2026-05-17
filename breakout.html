@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>무한 벽돌깨기</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #08101e 0%, #1a1830 100%);
+            color: #e0eaff;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+        .breakout-page-title {
+            position: fixed;
+            top: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 0.95em;
+            color: rgba(220, 230, 255, 0.5);
+            letter-spacing: 1px;
+            pointer-events: none;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="breakout-page-title">🧱 ENDLESS BREAKOUT</div>
+    <script type="module">
+        import { showEndlessBreakout } from './js/endless_breakout.js';
+        showEndlessBreakout(); // standalone (콜백 없음)
+    </script>
+</body>
+</html>

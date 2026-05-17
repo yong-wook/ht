@@ -11,7 +11,6 @@ import {
     showGomoku, showLaneRunner, showNumberBaseball, showBreakout,
     showSudoku, showMinesweeper, showSichuan, showPickpocket, showTetris, showGwageo,
 } from './minigames.js';
-import { showEndlessBreakout } from './endless_breakout.js';
 
 // ── 보드 타일 정의 (24칸) ─────────────────────────────────────────────
 export const BOARD_TILES = [
@@ -204,27 +203,10 @@ export function initBoard(onGameStart) {
     rollBtn.onclick = onRollClick;
 
     document.getElementById('board-levelup-btn').onclick = openLevelUpModal;
-    const ebBtn = document.getElementById('board-breakout-btn');
-    if (ebBtn) ebBtn.onclick = onEndlessBreakoutClick;
     updateLevelDisplay();
     startIncomeTimer();
 }
 
-function onEndlessBreakoutClick() {
-    showEndlessBreakout((destroyed) => {
-        const reward = destroyed * 50;
-        Game.setPlayerMoney(Game.playerMoney + reward);
-        UI.updateTotalMoneyDisplay(Game.playerMoney);
-        Game.saveGameData();
-        updateBoardInfo();
-        UI.showModal(
-            '벽돌깨기 종료',
-            destroyed > 0
-                ? `${destroyed}개 격파! +${reward.toLocaleString()}냥`
-                : '벽돌을 한 개도 못 깼습니다.'
-        );
-    });
-}
 
 // ── 새 턴 시작 (게임 복귀 후 호출) ────────────────────────────────────
 export function startNewTurn() {
