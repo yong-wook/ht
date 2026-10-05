@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(git -C \"C:\\\\Users\\\\hng11\\\\고스톱\" log --oneline)",
+      "WebSearch",
+      "Bash(node tests/test_logic.js)",
+      "Bash(python -m http.server 8080)",
+      "Bash(python3 -c *)",
+      "Bash(python -c *)",
+      "Bash(npx serve *)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"const fs=require\\('fs'\\); const c=fs.readFileSync\\('js/board.js','utf8'\\); console.log\\('showBanditFight:', c.includes\\('showBanditFight'\\)\\); console.log\\('fight-move-btn css:', fs.readFileSync\\('style.css','utf8'\\).includes\\('fight-move-btn'\\)\\); console.log\\('결투하기 option:', c.includes\\('결투하기'\\)\\);\")",
+      "Bash(node --input-type=module)",
+      "Bash(node *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(awk 'NR==2413,/^@media/' style.css)",
+      "Bash(grep -v \"//.*냥\\\\|ROLL_COST\\\\|updateBoard\\\\|updateTotal\\\\|saveGame\\\\|toLocale\")",
+      "Bash(dir js *)",
+      "Bash(powershell -Command \"Get-Item images/cards/01_gwang.jpg | Select-Object Length, Name\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File strip.ps1)",
+      "Bash(del strip.ps1)",
+      "Bash(git commit *)"
+    ]
+  }
+}

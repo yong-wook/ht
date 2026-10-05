@@ -81,102 +81,37 @@ function calculateScore(acquiredCards, bonusMultiplier = 1) {
 
     // 피
     const piCount = pi.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : 1), 0);
+    let piScore = 0;
     if (piCount >= 10) {
-        const piScore = piCount - 9;
+        piScore = piCount - 9;
         score += piScore;
         breakdown.push(`피 (${piScore}점)`);
+    }
+
+    // 멍텅구리 (열끗 7장 이상 시 2배)
+    let isMeong = false;
+    if (ggot.length >= 7) {
+        score *= 2;
+        breakdown.push("멍텅구리 (x2)");
+        isMeong = true;
     }
 
     // 룰렛 배율
     score *= bonusMultiplier;
 
-    return { score, breakdown, combos };
+    return { score, breakdown, combos, piScore, isMeong };
 }
 
 // ─── handleStop 승리 점수 계산 로직 (turn_manager.js에서 인라인) ──────────────
 
 /**
- * 버그 포함된 현재 코드 그대로 복사
- */
-function calcFinalScore_buggy({
-    playerAcquired, computerAcquired,
-    playerGoCount, playerShakeCount, playerBombCount,
-    currentRoundWinMultiplier = 1
-}) {
-    const playerResult   = calculateScore(playerAcquired);
-    const computerResult = calculateScore(computerAcquired);
-
-    let finalPlayerScore   = playerResult.score;
-    let finalComputerScore = computerResult.score;
-    let winner = '';
-    let breakdown = [];
-
-    if (finalPlayerScore > finalComputerScore) {
-        winner = 'player';
-        breakdown = [...playerResult.breakdown];
-
-        // 고 배율
-        if (playerGoCount > 0) {
-            if (playerGoCount === 1)      { finalPlayerScore += 1; breakdown.push('1고 (+1점)'); }
-            else if (playerGoCount === 2) { finalPlayerScore += 2; breakdown.push('2고 (+2점)'); }
-            else {
-                const m = Math.pow(2, playerGoCount - 2);
-                finalPlayerScore *= m;
-                breakdown.push(`${playerGoCount}고 (x${m})`);
-            }
-        }
-
-        // 피박 (버그: 플레이어가 피 점수를 얻었을 때만 발동)
-        const computerPiCount = computerAcquired.reduce(
-            (acc, c) => acc + (c.type === 'ssangpi' ? 2 : c.type === 'pi' ? 1 : 0), 0
-        );
-        if (playerResult.breakdown.some(b => b.startsWith('피')) && computerPiCount < 5) {
-            finalPlayerScore *= 2;
-            breakdown.push('피박 (x2)');
-        }
-
-        // 광박
-        if (playerResult.breakdown.some(b => b.startsWith('광')) &&
-            computerAcquired.filter(c => c.type === 'gwang').length === 0) {
-            finalPlayerScore *= 2;
-            breakdown.push('광박 (x2)');
-        }
-
-        // 고박
-        if (playerGoCount > 0 && finalComputerScore === 0) {
-            finalPlayerScore *= 2;
-            breakdown.push('고박 (x2)');
-        }
-
-        // 흔들기/폭탄
-        const sm = Math.pow(2, playerShakeCount + playerBombCount);
-        if (sm > 1) {
-            finalPlayerScore *= sm;
-            if (playerShakeCount > 0) breakdown.push(`흔들기 (x${Math.pow(2, playerShakeCount)})`);
-            if (playerBombCount  > 0) breakdown.push(`폭탄 (x${Math.pow(2, playerBombCount)})`);
-        }
-
-        if (currentRoundWinMultiplier > 1) {
-            finalPlayerScore *= currentRoundWinMultiplier;
-            breakdown.push(`승리 보너스 (x${currentRoundWinMultiplier})`);
-        }
-
-    } else if (finalComputerScore > finalPlayerScore) {
-        winner = 'computer';
-    } else {
-        winner = 'draw';
-    }
-
-    return { winner, finalPlayerScore, finalComputerScore, breakdown };
-}
-
-/**
- * 피박 조건 수정된 버전
- * 변경: breakdown 체크 제거 → 상대 피 5장 미만이면 무조건 피박
+ * 피박/고박/멍박 및 컴퓨터 정산이 정상화된 버전
  */
 function calcFinalScore_fixed({
     playerAcquired, computerAcquired,
-    playerGoCount, playerShakeCount, playerBombCount,
+    playerGoCount = 0, computerGoCount = 0,
+    playerShakeCount = 0, playerBombCount = 0,
+    computerShakeCount = 0, computerBombCount = 0,
     currentRoundWinMultiplier = 1
 }) {
     const playerResult   = calculateScore(playerAcquired);
@@ -202,11 +137,12 @@ function calcFinalScore_fixed({
             }
         }
 
-        // 피박 수정: breakdown 조건 제거
+        // 피박: 이긴 자가 피로 1점 이상 났을 때만 상대 피 5장 미만 시 발동
+        const hasPlayerPiScore = playerResult.piScore > 0 || playerResult.breakdown.some(b => b.startsWith('피'));
         const computerPiCount = computerAcquired.reduce(
             (acc, c) => acc + (c.type === 'ssangpi' ? 2 : c.type === 'pi' ? 1 : 0), 0
         );
-        if (computerPiCount < 5) {
+        if (hasPlayerPiScore && computerPiCount < 5) {
             finalPlayerScore *= 2;
             breakdown.push('피박 (x2)');
         }
@@ -218,10 +154,10 @@ function calcFinalScore_fixed({
             breakdown.push('광박 (x2)');
         }
 
-        // 고박
-        if (playerGoCount > 0 && finalComputerScore === 0) {
+        // 고박: 상대방(컴퓨터)이 고를 불렀는데 패배한 경우
+        if (computerGoCount > 0) {
             finalPlayerScore *= 2;
-            breakdown.push('고박 (x2)');
+            breakdown.push('상대 고박 (x2)');
         }
 
         // 흔들기/폭탄
@@ -239,6 +175,48 @@ function calcFinalScore_fixed({
 
     } else if (finalComputerScore > finalPlayerScore) {
         winner = 'computer';
+        breakdown = [...computerResult.breakdown];
+
+        // 컴퓨터 고 보너스
+        if (computerGoCount > 0) {
+            if (computerGoCount === 1)      { finalComputerScore += 1; breakdown.push('1고 (+1점)'); }
+            else if (computerGoCount === 2) { finalComputerScore += 2; breakdown.push('2고 (+2점)'); }
+            else {
+                const m = Math.pow(2, computerGoCount - 2);
+                finalComputerScore *= m;
+                breakdown.push(`${computerGoCount}고 (x${m})`);
+            }
+        }
+
+        // 피박: 컴퓨터가 피로 점수를 냈을 때만 플레이어 피 5장 미만 시 적용
+        const hasComputerPiScore = computerResult.piScore > 0 || computerResult.breakdown.some(b => b.startsWith('피'));
+        const playerPiCount = playerAcquired.reduce(
+            (acc, c) => acc + (c.type === 'ssangpi' ? 2 : c.type === 'pi' ? 1 : 0), 0
+        );
+        if (hasComputerPiScore && playerPiCount < 5) {
+            finalComputerScore *= 2;
+            breakdown.push('피박 (x2)');
+        }
+
+        // 광박
+        if (computerResult.breakdown.some(b => b.startsWith('광')) &&
+            playerAcquired.filter(c => c.type === 'gwang').length === 0) {
+            finalComputerScore *= 2;
+            breakdown.push('광박 (x2)');
+        }
+
+        // 고박: 플레이어가 고를 불렀는데 컴퓨터가 역전승한 경우
+        if (playerGoCount > 0) {
+            finalComputerScore *= 2;
+            breakdown.push('플레이어 고박 (x2)');
+        }
+
+        const csm = Math.pow(2, computerShakeCount + computerBombCount);
+        if (csm > 1) {
+            finalComputerScore *= csm;
+            if (computerShakeCount > 0) breakdown.push(`흔들기 (x${Math.pow(2, computerShakeCount)})`);
+            if (computerBombCount  > 0) breakdown.push(`폭탄 (x${Math.pow(2, computerBombCount)})`);
+        }
     } else {
         winner = 'draw';
     }
@@ -401,62 +379,131 @@ describe('calculateScore — 룰렛 배율', () => {
     assert(calculateScore(cards, 3).score === 9, '3점 x 룰렛3배 = 9점');
 });
 
-// ─── 2. 피박 버그 ─────────────────────────────────────────────────────────────
+describe('calculateScore — 멍텅구리 (열끗 7장 이상 2배)', () => {
+    const ggot = (m) => ({ type: 'ggot', month: m });
+    const seven = [ggot(1), ggot(2), ggot(3), ggot(4), ggot(5), ggot(6), ggot(7)];
+    const result = calculateScore(seven);
+    // 끗 7장 = 3점 x 멍텅구리 2배 = 6점
+    assert(result.score === 6, '열끗 7장 = 기본 3점 x 2배 = 6점');
+    assert(result.breakdown.includes('멍텅구리 (x2)'), 'breakdown에 멍텅구리 포함');
+});
 
-describe('피박 — 버그 재현 (Bug #3)', () => {
-    // 플레이어: 고도리(5점), 광 없음 → 광박 없음
-    // 컴퓨터: 피 3장(5장 미만), 광 없음
-    // → 피박 발동 기대: 5 × 2 = 10점
-    // → 현재 코드는 플레이어 breakdown에 '피'로 시작하는 항목 없으므로 피박 미발동 = 버그
+// ─── 2. 피박 ─────────────────────────────────────────────────────────────────
 
-    const playerAcquired = [
-        { type: 'ggot', month: 2 }, // 고도리
+describe('피박 — 정통 룰 (승자가 피 점수 있을 때만 발동)', () => {
+    // 플레이어: 고도리(5점) + 피 10장(1점) = 기본 6점
+    // 컴퓨터: 피 3장 (5장 미만)
+    // → 승자가 피 점수가 있으므로 피박 발동: 6 × 2 = 12점
+    const playerWithPi = [
+        { type: 'ggot', month: 2 },
         { type: 'ggot', month: 4 },
         { type: 'ggot', month: 8 },
-    ]; // 5점
+        ...Array.from({ length: 10 }, () => ({ type: 'pi' })),
+    ];
     const computerAcquired = [
         { type: 'pi' }, { type: 'pi' }, { type: 'pi' }, // 피 3장
     ];
 
-    const buggy = calcFinalScore_buggy({
-        playerAcquired, computerAcquired,
+    const withPiResult = calcFinalScore_fixed({
+        playerAcquired: playerWithPi, computerAcquired,
         playerGoCount: 0, playerShakeCount: 0, playerBombCount: 0
     });
+
+    assert(withPiResult.finalPlayerScore === 12,
+        '승자 피 점수 있음 + 상대 피 3장 → 피박 발동: 6 x 2 = 12점');
+    assert(withPiResult.breakdown.includes('피박 (x2)'),
+        'breakdown에 피박 (x2) 포함');
+
+    // 승자가 피 점수가 없을 때: 고도리(5점), 피 없음
+    // 컴퓨터: 피 3장
+    // → 승자 피 점수 없으므로 피박 미발동: 5점 유지
+    const playerWithoutPi = [
+        { type: 'ggot', month: 2 },
+        { type: 'ggot', month: 4 },
+        { type: 'ggot', month: 8 },
+    ];
+    const withoutPiResult = calcFinalScore_fixed({
+        playerAcquired: playerWithoutPi, computerAcquired,
+        playerGoCount: 0, playerShakeCount: 0, playerBombCount: 0
+    });
+
+    assert(withoutPiResult.finalPlayerScore === 5,
+        '승자 피 점수 없음 → 상대 피 적어도 피박 미발동: 5점 유지');
+    assert(!withoutPiResult.breakdown.includes('피박 (x2)'),
+        'breakdown에 피박 미포함');
+});
+
+describe('피박 — 상대 피 5장 이상이면 미발동', () => {
+    // 플레이어: 고도리(5점) + 피 10장(1점) = 6점
+    // 컴퓨터: 피 5장 (피박 기준선 이상)
+    const playerAcquired = [
+        { type: 'ggot', month: 2 },
+        { type: 'ggot', month: 4 },
+        { type: 'ggot', month: 8 },
+        ...Array.from({ length: 10 }, () => ({ type: 'pi' })),
+    ];
+    const computerAcquired = Array.from({ length: 5 }, () => ({ type: 'pi' }));
+
     const fixed = calcFinalScore_fixed({
         playerAcquired, computerAcquired,
         playerGoCount: 0, playerShakeCount: 0, playerBombCount: 0
     });
 
-    // 버그 확인: 피박 미발동 → 5점 그대로
-    assert(buggy.finalPlayerScore === 5,
-        '버그 코드: 플레이어 피 점수 없으면 피박 미발동 → 5점 그대로');
-    assert(!buggy.breakdown.includes('피박 (x2)'),
-        '버그 코드: breakdown에 피박 없음');
-
-    // 수정 확인: 피박 발동 → 10점
-    assert(fixed.finalPlayerScore === 10,
-        '수정 코드: 상대 피 5장 미만이면 피박 발동 → 10점');
-    assert(fixed.breakdown.includes('피박 (x2)'),
-        '수정 코드: breakdown에 피박 포함');
+    assert(fixed.finalPlayerScore === 6,  '상대 피 5장 → 피박 없음 = 6점');
+    assert(!fixed.breakdown.includes('피박 (x2)'), '피박 미발동 확인');
 });
 
-describe('피박 — 상대 피 5장 이상이면 미발동', () => {
-    // 플레이어: 고도리(5점), 광박/피박 없는 시나리오
-    // 컴퓨터: 피 5장(피박 경계)
+// ─── 2-1. 고박 (독박) ────────────────────────────────────────────────────────
+
+describe('고박 (독박) — 상대가 고를 외쳤으나 역전패한 경우', () => {
+    // 1) 컴퓨터가 고를 불렀는데 플레이어가 승리한 경우
     const playerAcquired = [
         { type: 'ggot', month: 2 },
         { type: 'ggot', month: 4 },
         { type: 'ggot', month: 8 },
     ]; // 5점
-    const computerAcquired = Array.from({ length: 5 }, () => ({ type: 'pi' })); // 정확히 5장
+    const computerAcquired = [
+        ...Array.from({ length: 5 }, () => ({ type: 'pi' })), // 피 5장 (피박 방지)
+    ];
 
-    const fixed = calcFinalScore_fixed({
+    const computerGoResult = calcFinalScore_fixed({
         playerAcquired, computerAcquired,
-        playerGoCount: 0, playerShakeCount: 0, playerBombCount: 0
+        playerGoCount: 0, computerGoCount: 1, // 컴퓨터 1고
     });
+    assert(computerGoResult.finalPlayerScore === 10, '컴퓨터 1고 후 플레이어 승리 → 상대 고박 2배: 5 x 2 = 10점');
+    assert(computerGoResult.breakdown.includes('상대 고박 (x2)'), 'breakdown에 상대 고박 포함');
 
-    assert(fixed.finalPlayerScore === 5,  '상대 피 5장 → 피박 없음 = 5점');
-    assert(!fixed.breakdown.includes('피박 (x2)'), '피박 미발동 확인');
+    // 2) 플레이어가 고를 불렀는데 컴퓨터가 승리한 경우
+    const playerGoResult = calcFinalScore_fixed({
+        playerAcquired: computerAcquired, // 플레이어 패배
+        computerAcquired: playerAcquired, // 컴퓨터 5점 승리
+        playerGoCount: 1, computerGoCount: 0, // 플레이어 1고
+    });
+    assert(playerGoResult.finalComputerScore === 10, '플레이어 1고 후 컴퓨터 승리 → 플레이어 고박 2배: 5 x 2 = 10점');
+    assert(playerGoResult.breakdown.includes('플레이어 고박 (x2)'), 'breakdown에 플레이어 고박 포함');
+});
+
+describe('컴퓨터 고 점수 정산', () => {
+    const playerAcquired = Array.from({ length: 6 }, () => ({ type: 'pi' })); // 0점 (피 6장)
+    const computerAcquired = [
+        { type: 'ggot', month: 2 },
+        { type: 'ggot', month: 4 },
+        { type: 'ggot', month: 8 },
+    ]; // 고도리 5점
+
+    const comp1Go = calcFinalScore_fixed({
+        playerAcquired, computerAcquired,
+        computerGoCount: 1,
+    });
+    assert(comp1Go.finalComputerScore === 6, '컴퓨터 1고 승리: 5 + 1 = 6점');
+    assert(comp1Go.breakdown.includes('1고 (+1점)'), 'breakdown에 1고 (+1점) 포함');
+
+    const comp3Go = calcFinalScore_fixed({
+        playerAcquired, computerAcquired,
+        computerGoCount: 3,
+    });
+    assert(comp3Go.finalComputerScore === 10, '컴퓨터 3고 승리: 5 x 2 = 10점');
+    assert(comp3Go.breakdown.includes('3고 (x2)'), 'breakdown에 3고 (x2) 포함');
 });
 
 // ─── 3. 광박 ─────────────────────────────────────────────────────────────────

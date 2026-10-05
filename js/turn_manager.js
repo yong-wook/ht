@@ -26,9 +26,13 @@ function handleFlippedCard(turn, playedCard) {
         const cardsToAcquire = [flippedCard, ...ppeokGroup];
         Game.acquireCards(turn, ...cardsToAcquire);
         audioManager.playSfx(SFX.CARD_MATCH);
-        UI.updateStatusMessage(`${flippedCard.month}월 뻑 패를 가져갑니다!`);
-        if (Game.takePiFromOpponent(turn)) {
-            UI.updateStatusMessage(UI.statusMessage.textContent + " 상대 피 1장 가져옴!");
+        const isSelfPpeok = (ppeokGroup.owner === turn);
+        UI.updateStatusMessage(`${flippedCard.month}월 ${isSelfPpeok ? '자뻑' : '뻑'} 패를 가져갑니다!`);
+        let piTakenCount = 0;
+        if (Game.takePiFromOpponent(turn)) piTakenCount++;
+        if (isSelfPpeok && Game.takePiFromOpponent(turn)) piTakenCount++;
+        if (piTakenCount > 0) {
+            UI.updateStatusMessage(UI.statusMessage.textContent + ` 상대 피 ${piTakenCount}장 가져옴!`);
         }
         endTurn(turn);
         return;
@@ -83,6 +87,7 @@ function handleFlippedCard(turn, playedCard) {
 
             // 뻑 패 그룹 생성 (뒤집은 카드 + 뱉어낸 카드들)
             const ppeokGroup = [flippedCard, ...cardsToVomit];
+            ppeokGroup.owner = turn;
             Game.tiedCards.push(ppeokGroup);
 
             endTurn(turn);
@@ -144,9 +149,13 @@ export function playerPlay(selectedCard, selectedCardDiv) {
         const ppeokGroup = Game.tiedCards.splice(ppeokGroupIndex, 1)[0];
         Game.setPlayerHand(Game.playerHand.filter((c) => c.id !== selectedCard.id));
         Game.acquireCards('player', selectedCard, ...ppeokGroup);
-        UI.updateStatusMessage(`${selectedCard.month}월 뻑 패를 가져갑니다!`);
-        if (Game.takePiFromOpponent('player')) {
-            UI.updateStatusMessage(UI.statusMessage.textContent + " 상대에게서 피 1장을 가져옵니다!");
+        const isSelfPpeok = (ppeokGroup.owner === 'player');
+        UI.updateStatusMessage(`${selectedCard.month}월 ${isSelfPpeok ? '자뻑' : '뻑'} 패를 가져갑니다!`);
+        let piTakenCount = 0;
+        if (Game.takePiFromOpponent('player')) piTakenCount++;
+        if (isSelfPpeok && Game.takePiFromOpponent('player')) piTakenCount++;
+        if (piTakenCount > 0) {
+            UI.updateStatusMessage(UI.statusMessage.textContent + ` 상대에게서 피 ${piTakenCount}장을 가져옵니다!`);
         }
         handleFlippedCard('player', null);
         return;
@@ -262,21 +271,35 @@ export function computerTurn() {
     UI.updateStatusMessage(`${Game.opponentName}의 턴입니다...`);
 
     setTimeout(() => {
+        // bomb_flip 카드가 손패에 있고 먹을 패가 마땅치 않을 때 또는 낼 일반 패가 없을 때
+        const bombFlipCard = Game.computerHand.find(c => c.type === 'bomb_flip');
+
         const { cardToPlay, matchingCard, reason } = findBestCardToPlay(Game.computerHand, Game.fieldCards, Game.tiedCards);
         console.log("컴퓨터 AI 결정:", reason);
+
+        // 만약 먹을 패가 없고 bomb_flip 카드가 있다면 bomb_flip을 우선 사용
+        if (!matchingCard && !reason.includes('폭탄') && !reason.includes('흔들기') && !reason.includes('뻑') && bombFlipCard) {
+            Game.setComputerHand(Game.computerHand.filter(c => c.id !== bombFlipCard.id));
+            UI.updateStatusMessage(`${Game.opponentName} 패 대신 덱을 뒤집습니다.`);
+            setTimeout(() => {
+                handleFlippedCard('computer', null);
+            }, 500);
+            return;
+        }
 
         if (cardToPlay) {
             // 폭탄 처리
             if (reason.includes('폭탄')) {
                 const bombSet = Game.computerHand.filter(c => c.month === cardToPlay.month);
-                UI.updateStatusMessage(`${Game.opponentName} ${cardToPlay.month}월 폭탄! 추가 뒤집기 2회`);
+                UI.updateStatusMessage(`${Game.opponentName} ${cardToPlay.month}월 폭탄!`);
                 Game.acquireCards('computer', ...bombSet, matchingCard);
                 Game.setComputerHand(Game.computerHand.filter(c => c.month !== cardToPlay.month));
                 Game.incrementComputerBomb();
-                Game.setPendingBombFlips(2);
-                Game.setBombFlipOwner('computer');
+                // 컴퓨터 손패에 뒤집기 전용 카드 2장 추가
+                Game.computerHand.push({ id: -101 - Date.now(), month: 0, type: 'bomb_flip', value: 0, img: '' });
+                Game.computerHand.push({ id: -102 - Date.now(), month: 0, type: 'bomb_flip', value: 0, img: '' });
                 if (Game.takePiFromOpponent('computer')) {
-                    UI.updateStatusMessage(UI.statusMessage.textContent + " ${Game.opponentName}이(가) 상대 피 1장 가져감!");
+                    UI.updateStatusMessage(UI.statusMessage.textContent + ` ${Game.opponentName}이(가) 상대 피 1장 가져감!`);
                 }
                 setTimeout(() => {
                     handleFlippedCard('computer', null);
@@ -288,22 +311,21 @@ export function computerTurn() {
             if (reason.includes('흔들기')) {
                 UI.updateStatusMessage(`${Game.opponentName} ${cardToPlay.month}월 흔들기!`);
                 Game.incrementComputerShake();
-                // 흔들기 후에는 그냥 카드를 냄 (일반적인 플레이로 진행)
-                // 하지만 여기서는 흔들기만 하고 카드를 내는 로직은 아래에서 처리됨
-                // 단, 흔들기는 카드를 내기 전에 선언하는 것이므로, 여기서 메시지 띄우고 진행
             }
 
             Game.setComputerHand(Game.computerHand.filter(c => c.id !== cardToPlay.id));
 
             if (reason.includes('뻑')) {
-                // 뻑 해제: cardToPlay + ppeokGroup 전체 한 번만 획득
-                // (matchingCard가 ppeokGroup[0]이므로 일반 획득 후 ppeokGroup 재획득하면 중복 발생)
                 const ppeokGroup = Game.tiedCards.find(group => group[0].month === cardToPlay.month);
                 if (ppeokGroup) {
                     Game.acquireCards('computer', cardToPlay, ...ppeokGroup);
                     Game.setTiedCards(Game.tiedCards.filter(group => group[0].month !== cardToPlay.month));
-                    if (Game.takePiFromOpponent('computer')) {
-                        UI.updateStatusMessage(UI.statusMessage.textContent + " ${Game.opponentName}이(가) 상대 피 1장 가져감!");
+                    const isSelfPpeok = (ppeokGroup.owner === 'computer');
+                    let piTakenCount = 0;
+                    if (Game.takePiFromOpponent('computer')) piTakenCount++;
+                    if (isSelfPpeok && Game.takePiFromOpponent('computer')) piTakenCount++;
+                    if (piTakenCount > 0) {
+                        UI.updateStatusMessage(UI.statusMessage.textContent + ` ${Game.opponentName}이(가) ${isSelfPpeok ? '자뻑으로 ' : ''}상대 피 ${piTakenCount}장 가져감!`);
                     }
                 }
             } else if (matchingCard) { // 일반 매칭
@@ -313,7 +335,7 @@ export function computerTurn() {
                 if (sameMonthFieldCards.length === 3) {
                     Game.acquireCards('computer', cardToPlay, ...sameMonthFieldCards);
                     if (Game.takePiFromOpponent('computer')) {
-                        UI.updateStatusMessage(UI.statusMessage.textContent + " ${Game.opponentName}이(가) 상대 피 1장 가져감!");
+                        UI.updateStatusMessage(UI.statusMessage.textContent + ` ${Game.opponentName}이(가) 상대 피 1장 가져감!`);
                     }
                 } else {
                     Game.acquireCards('computer', cardToPlay, matchingCard);
@@ -325,9 +347,16 @@ export function computerTurn() {
             updateFullBoard();
 
             setTimeout(() => {
-                handleFlippedCard('computer', matchingCard ? cardToPlay : null);
+                // 바닥에 내려놓았든 매칭했든 cardToPlay를 전달해야 쪽 판정 및 뻑 판정이 정상 동작함
+                handleFlippedCard('computer', cardToPlay);
             }, 500);
 
+        } else if (bombFlipCard) {
+            Game.setComputerHand(Game.computerHand.filter(c => c.id !== bombFlipCard.id));
+            UI.updateStatusMessage(`${Game.opponentName} 패 대신 덱을 뒤집습니다.`);
+            setTimeout(() => {
+                handleFlippedCard('computer', null);
+            }, 500);
         } else {
             // 낼 카드가 없으면 그냥 뒤집음
             handleFlippedCard('computer', null);
@@ -349,22 +378,18 @@ function endTurn(turn) {
         Game.updatePlayerScore();
         updateFullBoard();
 
-        // 폭탄 직후 2번째 자동 뒤집기
-        if (Game.pendingAutoBombFlips > 0) {
-            Game.setPendingAutoBombFlips(0);
-            setTimeout(() => {
-                UI.displayFlippedCard(null);
-                handleFlippedCard('player', null); // 2번째 자동 뒤집기
-            }, 1000);
-            return;
-        }
+        const currentScore = Game.playerScore;
+        const canDeclareGoStop = (currentScore >= 3) && (
+            Game.playerGoCount === 0 ? true : currentScore > Game.lastPlayerGoScore
+        );
 
-        if (Game.playerScore >= 3) {
+        if (canDeclareGoStop) {
             UI.showGoStopButtons(true);
-            UI.updateStatusMessage("3점 이상! '고' 또는 '스톱'을 선택하세요.");
+            UI.updateStatusMessage(`${currentScore}점 달성! '고' 또는 '스톱'을 선택하세요.`);
         } else {
             setTimeout(() => {
                 UI.displayFlippedCard(null);
+                if (checkGameOver()) return;
                 computerTurn();
             }, 1000);
         }
@@ -372,18 +397,49 @@ function endTurn(turn) {
         Game.updateComputerScore();
         updateFullBoard();
 
-        // 컴퓨터 폭탄 추가 뒤집기는 자동 진행 (컴퓨터 소유일 때만)
-        if (Game.bombFlipOwner === 'computer' && Game.consumeBombFlip()) {
-            setTimeout(() => {
-                UI.displayFlippedCard(null);
-                handleFlippedCard('computer', null);
-            }, 1000);
-            return;
+        const currentScore = Game.computerScore;
+        const canComputerGoStop = (currentScore >= 3) && (
+            Game.computerGoCount === 0 ? true : currentScore > Game.lastComputerGoScore
+        );
+
+        if (canComputerGoStop) {
+            // 컴퓨터의 고/스톱 판단 알고리즘
+            // 1. 이미 1고 이상이면 추가 고 지양(안전하게 스톱)
+            // 2. 플레이어 점수가 1점 이상 있거나 역전 위험이 있으면 스톱
+            // 3. 덱이 4장 이하로 얼마 안 남았으면 스톱
+            // 4. 점수가 6점 이상이면 안전하게 스톱
+            // 5. 그 외(초반 3~5점, 플레이어 0점, 덱 6장 이상)에만 1고 시도
+            const shouldGo = (
+                Game.computerGoCount < 1 &&
+                currentScore <= 5 &&
+                Game.playerScore === 0 &&
+                Game.deck.length >= 6
+            );
+
+            if (shouldGo) {
+                Game.incrementComputerGo();
+                Game.setLastComputerGoScore(currentScore);
+                audioManager.playSfx(SFX.GO);
+                UI.updateStatusMessage(`${Game.opponentName} ${Game.computerGoCount}고 선언!`);
+                setTimeout(() => {
+                    UI.displayFlippedCard(null);
+                    if (checkGameOver()) return;
+                    UI.updateStatusMessage("플레이어 턴입니다.");
+                }, 1200);
+                return;
+            } else {
+                audioManager.playSfx(SFX.STOP);
+                UI.updateStatusMessage(`${Game.opponentName} 스톱 선언!`);
+                setTimeout(() => {
+                    handleStop();
+                }, 1200);
+                return;
+            }
         }
 
         setTimeout(() => {
             UI.displayFlippedCard(null);
-            checkGameOver();
+            if (checkGameOver()) return;
             UI.updateStatusMessage("플레이어 턴입니다.");
         }, 1000);
     }
@@ -401,6 +457,7 @@ export function handleExtraFlip(turn) {
 export function handleGo() {
     audioManager.playSfx(SFX.GO);
     Game.incrementPlayerGo();
+    Game.setLastPlayerGoScore(Game.playerScore);
     UI.updateStatusMessage(`플레이어 ${Game.playerGoCount}고! ${Game.opponentName}의 턴입니다.`);
     UI.showGoStopButtons(false);
     setTimeout(computerTurn, 1000);
@@ -423,7 +480,7 @@ export function handleStop() {
 
         if (finalPlayerScore > finalComputerScore) {
             winner = 'player';
-            breakdown = playerResult.breakdown;
+            breakdown = [...playerResult.breakdown];
 
             if (Game.playerGoCount > 0) {
                 if (Game.playerGoCount === 1) { finalPlayerScore += 1; breakdown.push(`1고 (+1점)`); }
@@ -434,18 +491,22 @@ export function handleStop() {
                     breakdown.push(`${Game.playerGoCount}고 (x${goMultiplier})`);
                 }
             }
+            // 피박: 이긴 자가 피로 1점 이상 났을 때만 상대 피 5장 미만 시 적용
+            const hasPlayerPiScore = playerResult.piScore > 0 || playerResult.breakdown.some(b => b.startsWith('피'));
             const computerPiCount = Game.computerAcquired.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : (cur.type === 'pi' ? 1 : 0)), 0);
-            if (computerPiCount < 5) {
+            if (hasPlayerPiScore && computerPiCount < 5) {
                 finalPlayerScore *= 2;
                 breakdown.push(`피박 (x2)`);
             }
+            // 광박: 이긴 자가 광으로 점수를 냈을 때만 상대 광 0장 시 적용
             if (playerResult.breakdown.some(b => b.startsWith('광')) && Game.computerAcquired.filter(c => c.type === 'gwang').length === 0) {
                 finalPlayerScore *= 2;
                 breakdown.push(`광박 (x2)`);
             }
-            if (Game.playerGoCount > 0 && finalComputerScore === 0) {
+            // 고박: 상대방(컴퓨터)이 고를 불렀는데 플레이어가 승리한 경우
+            if (Game.computerGoCount > 0) {
                 finalPlayerScore *= 2;
-                breakdown.push(`고박 (x2)`);
+                breakdown.push(`상대 고박 (x2)`);
             }
             const shakeAndBombMultiplier = Math.pow(2, Game.playerShakeCount + Game.playerBombCount);
             if (shakeAndBombMultiplier > 1) {
@@ -481,15 +542,34 @@ export function handleStop() {
 
         } else if (finalComputerScore > finalPlayerScore) {
             winner = 'computer';
-            breakdown = computerResult.breakdown;
+            breakdown = [...computerResult.breakdown];
+
+            // 컴퓨터 고 점수 계산
+            if (Game.computerGoCount > 0) {
+                if (Game.computerGoCount === 1) { finalComputerScore += 1; breakdown.push(`1고 (+1점)`); }
+                else if (Game.computerGoCount === 2) { finalComputerScore += 2; breakdown.push(`2고 (+2점)`); }
+                else {
+                    const goMultiplier = Math.pow(2, Game.computerGoCount - 2);
+                    finalComputerScore *= goMultiplier;
+                    breakdown.push(`${Game.computerGoCount}고 (x${goMultiplier})`);
+                }
+            }
+            // 피박: 컴퓨터가 피로 점수를 냈을 때만 플레이어 피 5장 미만 시 적용
+            const hasComputerPiScore = computerResult.piScore > 0 || computerResult.breakdown.some(b => b.startsWith('피'));
             const playerPiCount = Game.playerAcquired.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : (cur.type === 'pi' ? 1 : 0)), 0);
-            if (playerPiCount < 5) {
+            if (hasComputerPiScore && playerPiCount < 5) {
                 finalComputerScore *= 2;
                 breakdown.push(`피박 (x2)`);
             }
+            // 광박: 컴퓨터가 광으로 점수를 냈을 때만 플레이어 광 0장 시 적용
             if (computerResult.breakdown.some(b => b.startsWith('광')) && Game.playerAcquired.filter(c => c.type === 'gwang').length === 0) {
                 finalComputerScore *= 2;
                 breakdown.push(`광박 (x2)`);
+            }
+            // 고박: 플레이어가 고를 불렀는데 컴퓨터가 역전승한 경우
+            if (Game.playerGoCount > 0) {
+                finalComputerScore *= 2;
+                breakdown.push(`플레이어 고박 (x2)`);
             }
             const computerShakeAndBombMultiplier = Math.pow(2, Game.computerShakeCount + Game.computerBombCount);
             if (computerShakeAndBombMultiplier > 1) {
@@ -507,7 +587,7 @@ export function handleStop() {
             handleGameEnd();
 
         } else {
-            UI.showResultModal('draw', 0, 0, ['무승부!']);
+            UI.showResultModal('draw', 0, 0, ['무승부 (나가리)']);
             UI.updateTotalMoneyDisplay(Game.playerMoney);
             Game.saveGameData();
             Game.setLastRoundWinner('draw');
@@ -523,7 +603,9 @@ export function checkGameOver() {
         UI.showModal("게임 종료", "더 이상 낼 패가 없습니다. 점수를 계산합니다.", () => {
             handleStop();
         });
+        return true;
     }
+    return false;
 }
 
 export function handlePlayerBomb(bombSet, fieldCard) {
@@ -535,8 +617,6 @@ export function handlePlayerBomb(bombSet, fieldCard) {
     // 추가 뒤집기 카드 2장을 패에 추가 (이후 턴에서 자유롭게 사용)
     Game.playerHand.push({ id: -1, month: 0, type: 'bomb_flip', value: 0, img: '' });
     Game.playerHand.push({ id: -2, month: 0, type: 'bomb_flip', value: 0, img: '' });
-    // 폭탄 직후 자동 연속 뒤집기 1회 예약 (1번째는 아래에서 직접 실행)
-    Game.setPendingAutoBombFlips(1);
     if (Game.takePiFromOpponent('player')) {
         UI.updateStatusMessage(UI.statusMessage.textContent + " 상대에게서 피 1장을 가져옵니다!");
     }

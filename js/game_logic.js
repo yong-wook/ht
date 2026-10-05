@@ -110,6 +110,7 @@ export function findBestCardToPlay(computerHand, fieldCards, tiedCards) {
     });
 
     for (const month in handCounts) {
+        if (month === '0') continue; // 폭탄 뒤집기 더미 카드는 제외
         if (handCounts[month] === 3) {
             const cardsInHand = computerHand.filter(c => c.month == month);
             const matchingFieldCards = fieldCards.filter(c => c.month == month);

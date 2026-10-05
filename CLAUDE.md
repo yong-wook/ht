@@ -78,15 +78,3 @@ Each stage has 12 background images at `images/stages/stage{N}/showtime_bg_stage
 
 - `NumpadAdd` / `+`: Forces showtime (sets computer money to 0)
 - `Shift+M`: Adds 100,000 to player money
-
-## MindVault — MANDATORY
-
-**ALWAYS run `mindvault query "<question>" --global` BEFORE answering any codebase question.**
-This is not optional. The knowledge graph contains project context, relationships, and decisions
-that you cannot derive from reading files alone.
-
-1. Run `mindvault query "<question>" --global` first
-2. Read the Search Results, Graph Context, and Wiki Context in the output
-3. Use this context to inform your answer — do NOT ignore it
-4. If `mindvault-out/` doesn't exist, run `mindvault ingest .` first
-5. Only fall back to reading raw files if MindVault returns no results

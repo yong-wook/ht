@@ -10,6 +10,10 @@ export let playerAcquired = [];
 export let computerAcquired = [];
 export let playerGoCount = 0;
 export let computerGoCount = 0;
+export let lastPlayerGoScore = 0;
+export let lastComputerGoScore = 0;
+export function setLastPlayerGoScore(score) { lastPlayerGoScore = score; }
+export function setLastComputerGoScore(score) { lastComputerGoScore = score; }
 export let playerBombCount = 0;
 export let playerShakeCount = 0;
 export let computerBombCount = 0;
@@ -106,6 +110,9 @@ export function dealCards(CARDS) {
     playerAcquired = [];
     computerAcquired = [];
     playerGoCount = 0;
+    computerGoCount = 0;
+    lastPlayerGoScore = 0;
+    lastComputerGoScore = 0;
     playerBombCount = 0;
     playerShakeCount = 0;
     computerBombCount = 0;
@@ -260,10 +267,19 @@ export function calculateScore(acquiredCards) {
 
     // 피 점수
     const piCount = pi.reduce((acc, cur) => acc + (cur.type === 'ssangpi' ? 2 : 1), 0);
+    let piScore = 0;
     if (piCount >= 10) {
-        const piScore = piCount - 9;
+        piScore = piCount - 9;
         score += piScore;
         breakdown.push(`피 (${piScore}점)`);
+    }
+
+    // 멍텅구리 (열끗 7장 이상 시 2배)
+    let isMeong = false;
+    if (ggot.length >= 7) {
+        score *= 2;
+        breakdown.push("멍텅구리 (x2)");
+        isMeong = true;
     }
 
     // 룰렛 보너스 적용 (점수 배율)
@@ -272,7 +288,7 @@ export function calculateScore(acquiredCards) {
         breakdown.push(`룰렛 보너스: 점수 ${currentRoundBonusMultiplier}배`);
     }
 
-    return { score, breakdown, combos };
+    return { score, breakdown, combos, piScore, isMeong };
 }
 
 // 라운드 종료 후 판돈 계산
@@ -324,6 +340,7 @@ export function setComputerHand(newHand) { computerHand = newHand; }
 export function setFieldCards(newCards) { fieldCards = newCards; }
 export function setTiedCards(newCards) { tiedCards = newCards; }
 export function incrementPlayerGo() { playerGoCount++; }
+export function incrementComputerGo() { computerGoCount++; }
 export function incrementPlayerBomb() { playerBombCount++; }
 export function incrementPlayerShake() { playerShakeCount++; }
 export function incrementComputerBomb() { computerBombCount++; }
