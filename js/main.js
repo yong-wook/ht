@@ -37,6 +37,19 @@ function startGame(stage) {
     UI.setOpponentNameDisplay(Game.opponentName);
     UI.updateMoneyDisplay(Game.playerMoney, Game.moneyPerPoint);
 
+    // 캐릭터 인트로 대사 출력 및 음성 재생
+    if (stage && stage.dialogues && stage.dialogues.length > 0) {
+        const collected = (Game.unlockedBackgrounds[stage.id.toString()] || []).length;
+        let introLine = stage.dialogues[0];
+        if (collected >= 12) introLine = stage.dialogues[4] || stage.dialogues[0];
+        else if (collected >= 8) introLine = stage.dialogues[3] || stage.dialogues[0];
+        else if (collected >= 4) introLine = stage.dialogues[2] || stage.dialogues[0];
+        else if (collected >= 1) introLine = stage.dialogues[1] || stage.dialogues[0];
+
+        UI.updateStatusMessage(`${stage.characterName}: "${introLine}"`);
+        audioManager.playVoice(stage.characterName, introLine);
+    }
+
     initGame();
 }
 

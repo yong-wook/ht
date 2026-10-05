@@ -2,6 +2,7 @@ import { STAGES, SHOWTIME_REPLAY_COST } from './config.js';
 import * as Game from './game.js';
 import * as UI from './ui.js';
 import * as Showtime from './showtime.js';
+import { audioManager } from './audio.js';
 
 let selectedStage = null;
 let _onStageSelect = null;
@@ -82,7 +83,9 @@ export function openCharPanel(stage, onGameStartOverride, onFavorOverride) {
     document.getElementById('char-panel-name').textContent = stage.characterName;
     document.getElementById('char-panel-hearts').innerHTML = buildHeartsHtml(collected);
     document.getElementById('char-panel-collection-text').textContent = `수집: ${collected} / 12`;
-    document.getElementById('char-panel-dialogue').textContent = `"${getDialogue(stage, collected)}"`;
+    const dialogueText = getDialogue(stage, collected);
+    document.getElementById('char-panel-dialogue').textContent = `"${dialogueText}"`;
+    audioManager.playVoice(stage.characterName, dialogueText);
 
     const btns = document.getElementById('char-panel-btns');
 
@@ -210,6 +213,7 @@ function openLockedPanel(stage) {
 // ── 패널 닫기 ──────────────────────────────────────────────────────────────────
 function closeCharPanel() {
     document.getElementById('char-panel').style.display = 'none';
+    audioManager.stopVoice();
 }
 
 export function getSelectedStage() {

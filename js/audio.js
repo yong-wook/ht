@@ -101,12 +101,57 @@ class AudioManager {
 
     setSfxMuted(muted) {
         this.sfxMuted = muted;
+        if (muted) this.stopVoice();
         this._saveSettings();
     }
 
     setSfxVolume(v) {
         this.sfxVolume = Math.max(0, Math.min(1, v));
         this._saveSettings();
+    }
+
+    // ── 캐릭터 보이스 (Web Speech API) ───────────────────────────────────────
+    playVoice(characterName, text) {
+        if (this.sfxMuted || this.sfxVolume <= 0) return;
+        if (!('speechSynthesis' in window)) return;
+
+        // 특수기호 및 인용부호 정제
+        const cleanText = text.replace(/["'♥♡✨⚔💰🎁]/g, '').trim();
+        if (!cleanText) return;
+
+        window.speechSynthesis.cancel(); // 이전 발화 중단
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'ko-KR';
+        utterance.volume = this.sfxVolume;
+
+        // 8인 캐릭터별 보이스 톤(피치 & 속도) 프로필
+        const profiles = {
+            '소이': { pitch: 1.35, rate: 1.05 }, // 풋풋하고 발랄한 하이톤
+            '아린': { pitch: 1.15, rate: 0.98 }, // 성숙하고 나긋나긋한 톤
+            '나연': { pitch: 1.25, rate: 1.10 }, // 쾌활하고 당찬 톤
+            '하은': { pitch: 1.05, rate: 0.95 }, // 차분하고 부드러운 톤
+            '채아': { pitch: 1.30, rate: 1.00 }, // 도도하고 앙칼진 톤
+            '서린': { pitch: 0.90, rate: 0.95 }, // 시크하고 서늘한 저음 톤
+            '혜화': { pitch: 1.10, rate: 0.90 }, // 기품 있고 여유로운 어조
+            '봉황': { pitch: 0.75, rate: 0.85 }, // 압도적 카리스마의 중저음 보스 톤
+        };
+
+        const prof = profiles[characterName] || { pitch: 1.0, rate: 1.0 };
+        utterance.pitch = prof.pitch;
+        utterance.rate  = prof.rate;
+
+        const voices = window.speechSynthesis.getVoices();
+        const koVoice = voices.find(v => v.lang && v.lang.startsWith('ko'));
+        if (koVoice) utterance.voice = koVoice;
+
+        window.speechSynthesis.speak(utterance);
+    }
+
+    stopVoice() {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
     }
 }
 
