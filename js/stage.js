@@ -60,13 +60,17 @@ function buildHeartsHtml(count) {
 }
 
 // ── 대사 선택 ──────────────────────────────────────────────────────────────────
+function getDialogueIndex(collected) {
+    if (collected >= 12) return 4;
+    if (collected >= 8)  return 3;
+    if (collected >= 4)  return 2;
+    if (collected >= 1)  return 1;
+    return 0;
+}
+
 function getDialogue(stage, collected) {
-    const d = stage.dialogues;
-    if (collected >= 12) return d[4];
-    if (collected >= 8)  return d[3];
-    if (collected >= 4)  return d[2];
-    if (collected >= 1)  return d[1];
-    return d[0];
+    const idx = getDialogueIndex(collected);
+    return stage.dialogues[idx];
 }
 
 // ── 해금 캐릭터 패널 ───────────────────────────────────────────────────────────
@@ -83,9 +87,10 @@ export function openCharPanel(stage, onGameStartOverride, onFavorOverride) {
     document.getElementById('char-panel-name').textContent = stage.characterName;
     document.getElementById('char-panel-hearts').innerHTML = buildHeartsHtml(collected);
     document.getElementById('char-panel-collection-text').textContent = `수집: ${collected} / 12`;
-    const dialogueText = getDialogue(stage, collected);
+    const dIdx = getDialogueIndex(collected);
+    const dialogueText = stage.dialogues[dIdx];
     document.getElementById('char-panel-dialogue').textContent = `"${dialogueText}"`;
-    audioManager.playVoice(stage.characterName, dialogueText);
+    audioManager.playVoice(stage.characterName, dialogueText, stage.id, dIdx);
 
     const btns = document.getElementById('char-panel-btns');
 
